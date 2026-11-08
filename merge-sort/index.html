@@ -153,6 +153,16 @@ input[type=range]{accent-color:var(--left)}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
 .stats b{display:block;font-family:var(--f-display);font-size:1.4rem;font-variant-numeric:tabular-nums}
 .stats span{font-size:.75rem;color:var(--muted)}
+.vgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.vcell{border:1.5px solid var(--line);border-radius:8px;padding:5px 6px;text-align:center;transition:border-color .2s,background .2s}
+.vcell span{display:block;font-family:var(--f-mono);font-size:.7rem;color:var(--muted)}
+.vcell b{font-family:var(--f-display);font-size:1.35rem;font-variant-numeric:tabular-nums}
+.vcell.na b{color:var(--muted);font-weight:400}
+.vcell.on{border-color:var(--hot);background:var(--hot-soft)}
+.vcell.main{border-width:2px}
+.vform{font-family:var(--f-mono);font-size:.76rem;color:var(--muted);margin-top:8px;min-height:2.9em;line-height:1.45}
+.vform b{color:var(--ink);font-weight:600}
+.idx div.mid{color:var(--hot);font-weight:700}
 .scrub{width:100%}
 .err{color:var(--hot);font-size:.85rem}
 
@@ -268,6 +278,13 @@ mark.anno.flash{animation:annoflash 1.2s ease 2}
 .nb-x{background:none;border:1px solid var(--line);border-radius:8px;padding:4px 10px;cursor:pointer;font:inherit;color:var(--ink)}
 @media (min-width:1180px){body.nb-open{padding-right:calc(400px + 16px)}}
 @media print{.nb-ui{display:none!important}}
+.nb-ui[hidden]{display:none!important}
+/* long code lines scroll inside their box instead of widening the whole page */
+section>*,.stack>*{min-width:0}
+section,.stack,.bench{grid-template-columns:minmax(0,1fr)}
+.map{grid-template-columns:auto minmax(0,1fr)}
+.map dd,.map dt{overflow-wrap:anywhere}
+@media (max-width:520px){.map{grid-template-columns:minmax(0,1fr)}.map dd{margin-bottom:6px}}
 </style>
 
 <div class="wrap">
@@ -378,6 +395,17 @@ mark.anno.flash{animation:annoflash 1.2s ease 2}
       </div>
       <div class="side">
         <div class="pc" id="v-pc" aria-label="Pseudocode"></div>
+        <div class="box"><h4>Variables right now <span style="text-transform:none;letter-spacing:0;font-weight:400">· pink = changed this step</span></h4>
+          <div class="vgrid" id="v-vars">
+            <div class="vcell main" id="vc-mid"><span>mid</span><b>–</b></div>
+            <div class="vcell" id="vc-lo"><span>lo</span><b>–</b></div>
+            <div class="vcell" id="vc-hi"><span>hi</span><b>–</b></div>
+            <div class="vcell" id="vc-i"><span>i</span><b>–</b></div>
+            <div class="vcell" id="vc-j"><span>j</span><b>–</b></div>
+            <div class="vcell" id="vc-k"><span>k</span><b>–</b></div>
+          </div>
+          <div class="vform" id="v-vform"></div>
+        </div>
         <div class="box"><h4>Call stack (top = running now)</h4><div class="callstack" id="v-stack"></div></div>
         <div class="box stats">
           <div><b id="v-n-step">0</b><span>step</span></div>
@@ -977,8 +1005,39 @@ function vLoad(){
   vRender();
 }
 
+// What the Variables box shows for a frame. In bottom-up mode the frames already hold mid/hi on the
+// `lo` line, so hide them until the pseudocode line that computes them has run.
+function shownVar(fr, k){
+  if(!fr) return null;
+  if(V.mode === 'bu'){
+    if(k === 'mid' && (fr.line === 'bulo')) return null;
+    if(k === 'hi' && (fr.line === 'bulo' || fr.line === 'buhi')) return null;
+  }
+  return fr[k];
+}
+function renderVars(f){
+  const prev = V.frames[V.idx - 1];
+  ['mid','lo','hi','i','j','k'].forEach(k => {
+    const val = shownVar(f, k), el = $('#vc-' + k);
+    el.querySelector('b').textContent = val === null ? '–' : val;
+    el.classList.toggle('na', val === null);
+    el.classList.toggle('on', val !== null && !!prev && shownVar(prev, k) !== val);
+  });
+  const lo = shownVar(f, 'lo'), mid = shownVar(f, 'mid'), hi = shownVar(f, 'hi');
+  let form = '';
+  if(mid !== null && lo !== null){
+    form = V.mode === 'td'
+      ? `mid = lo + (hi − lo) / 2<br>    = ${lo} + (${hi} − ${lo}) / 2 = <b>${mid}</b>`
+      : `mid = lo + width − 1<br>    = ${lo} + ${mid - lo + 1} − 1 = <b>${mid}</b>`;
+    if(hi !== null) form += `<br>left a[${lo}..${mid}] · right a[${mid + 1}..${hi}]`;
+  } else if(lo !== null) form = 'mid is not computed yet in this call.';
+  else if(!f.final) form = 'Nothing is running yet, so no variables are set.';
+  $('#v-vform').innerHTML = form;
+}
+
 function vRender(){
   const f = V.frames[V.idx], n = V.input.length, max = Math.max(...V.input);
+  const midNow = shownVar(f, 'mid');
   const cols = `repeat(${n}, minmax(26px, 1fr))`;
   const inMerge = f.aux !== null;
   let bars = '', idx = '', km = '', auxr = '', ijm = '';
@@ -995,7 +1054,7 @@ function vRender(){
     if(f.ev === 'write' && c === f.k) cls += ' wk';
     const v = f.arr[c];
     bars += `<div class="col ${cls}"><span class="v">${v}</span><div class="bar" style="height:${Math.max(6, v/max*150)}px"></div></div>`;
-    idx += `<div class="${f.mid !== null && !f.final && c === f.mid + 1 ? 'split' : ''}">${c}</div>`;
+    idx += `<div class="${[midNow !== null && !f.final && c === midNow + 1 ? 'split' : '', midNow !== null && !f.final && c === midNow ? 'mid' : ''].join(' ').trim()}">${c}</div>`;
     km += `<div>${f.k === c ? '<span class="k">k↑</span>' : ''}</div>`;
     if(inMerge && c >= f.lo && c <= f.hi){
       const side = c <= f.mid ? 'L' : 'R';
@@ -1036,6 +1095,7 @@ function vRender(){
   $('#v-n-step').textContent = `${V.idx}/${V.frames.length-1}`;
   $('#v-n-cmp').textContent = f.cmp;
   $('#v-n-wr').textContent = f.wr;
+  renderVars(f);
   $('#v-scrub').value = V.idx;
   $('#v-play').textContent = V.timer ? '⏸ Pause' : '▶ Play';
 }
