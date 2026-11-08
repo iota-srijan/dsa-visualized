@@ -1,0 +1,287 @@
+<title>Bottom-Up Merge Sort Ladder</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@600;700&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one column. A "ladder" of rows (one per pass) on the left, the live code on the right. */
+:root{
+  --bg:#F1F3F6; --surface:#FFFFFF; --sunk:#E7EBF0; --ink:#131B25; --muted:#576373; --line:#D3D9E1;
+  --left:#4A54CF; --right:#B8720C; --merged:#1F8A55; --hot:#CF3463;
+  --left-soft:#E2E4FA; --right-soft:#F6E7CF; --merged-soft:#D5EFE1; --hot-soft:#F9DAE3;
+  --f-display:'Familjen Grotesk','Segoe UI',system-ui,sans-serif;
+  --f-body:'Atkinson Hyperlegible','Segoe UI',system-ui,sans-serif;
+  --f-mono:'JetBrains Mono',ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0C1117; --surface:#141B24; --sunk:#1B2430; --ink:#E4E9EF; --muted:#93A0AF; --line:#2A3441;
+  --left:#8D95FF; --right:#ECA944; --merged:#52C889; --hot:#FF6B93;
+  --left-soft:#232853; --right-soft:#3B2C12; --merged-soft:#153626; --hot-soft:#431828;
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0C1117; --surface:#141B24; --sunk:#1B2430; --ink:#E4E9EF; --muted:#93A0AF; --line:#2A3441;
+  --left:#8D95FF; --right:#ECA944; --merged:#52C889; --hot:#FF6B93;
+  --left-soft:#232853; --right-soft:#3B2C12; --merged-soft:#153626; --hot-soft:#431828;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:17px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:40px 64px}
+.wrap{max-width:1080px;margin:0 auto;display:grid;gap:22px}
+h1,h2{font-family:var(--f-display);margin:0;line-height:1.15;text-wrap:balance}
+h1{font-size:clamp(2rem,5vw,3rem);letter-spacing:-.02em}
+h2{font-size:1.3rem}
+p{margin:0}
+.lead{color:var(--muted);max-width:66ch;font-size:1.08rem}
+code{font-family:var(--f-mono);font-size:.86em}
+.eyebrow{font-family:var(--f-mono);font-size:.74rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+
+.bench{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;display:grid;gap:16px}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.toolbar .sep{width:1px;height:26px;background:var(--line);margin-inline:4px}
+.toolbar label{font-size:.85rem;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
+button,select{font:inherit;font-size:.92rem;color:var(--ink)}
+.btn{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 13px;cursor:pointer;line-height:1.2}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink);min-width:110px}
+select{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:7px 10px}
+.btn:focus-visible,select:focus-visible,.bench:focus-visible{outline:2px solid var(--left);outline-offset:2px}
+.progress{height:4px;background:var(--sunk);border-radius:2px;overflow:hidden}
+.progress div{height:100%;background:var(--left);transition:width .2s}
+
+.body{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:860px){.body{grid-template-columns:minmax(0,1fr)}}
+
+.ladder-wrap{overflow-x:auto;padding-bottom:4px}
+.ladder{display:grid;gap:10px}
+.rung{display:grid;grid-template-columns:96px minmax(0,1fr);gap:10px;align-items:center}
+.rlab{font-family:var(--f-mono);font-size:.72rem;color:var(--muted);line-height:1.3}
+.rlab b{display:block;color:var(--ink);font-size:.8rem}
+.rung.target .rlab b{color:var(--hot)}
+.grid{display:grid;gap:6px}
+.idx{font-family:var(--f-mono);font-size:.68rem;color:var(--muted);text-align:center}
+.pile{display:flex;gap:2px;padding:3px;border-radius:8px;border:2px solid var(--merged);background:var(--merged-soft);min-width:0;transition:background .2s,border-color .2s,opacity .2s}
+.pile span{flex:1;min-width:0;text-align:center;font-family:var(--f-mono);font-weight:600;font-size:.9rem;padding:6px 0;border-radius:4px;background:var(--surface);font-variant-numeric:tabular-nums}
+.pile.wait{border:2px dashed var(--line);background:transparent;opacity:.45}
+.pile.wait span{background:transparent;color:var(--muted)}
+.pile.carry{border:2px dashed var(--muted);background:var(--sunk)}
+.pile.L{border-color:var(--left);background:var(--left-soft)}
+.pile.R{border-color:var(--right);background:var(--right-soft)}
+.pile.new{border-color:var(--hot);background:var(--hot-soft);animation:pop .35s ease}
+.pile.final{border-color:var(--merged);background:var(--merged-soft)}
+@keyframes pop{from{transform:scale(.92)}to{transform:none}}
+.tag{font-family:var(--f-mono);font-size:.68rem;text-align:center;height:1.2em;color:var(--muted)}
+.tag .l{color:var(--left);font-weight:600} .tag .r{color:var(--right);font-weight:600} .tag .c{color:var(--muted);font-weight:600}
+
+.side{display:grid;gap:14px;min-width:0}
+.vars{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.var{border:1px solid var(--line);border-radius:10px;padding:8px 10px;text-align:center;transition:border-color .2s,background .2s}
+.var span{display:block;font-family:var(--f-mono);font-size:.72rem;color:var(--muted)}
+.var b{font-family:var(--f-display);font-size:1.5rem;font-variant-numeric:tabular-nums}
+.var.on{border-color:var(--hot);background:var(--hot-soft)}
+.code{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 0;font-family:var(--f-mono);font-size:.8rem;line-height:1.5;overflow-x:auto}
+.code div{padding:3px 12px;white-space:pre;border-left:3px solid transparent}
+.code div.on{background:var(--hot-soft);border-left-color:var(--hot)}
+.code .live{display:block;color:var(--hot);font-weight:600;padding-left:2ch;min-height:1.2em}
+.code .kw{color:var(--left)}
+.narr{background:var(--sunk);border-radius:10px;padding:12px 14px;min-height:4.6em}
+.narr b{font-family:var(--f-mono)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.82rem;color:var(--muted)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px;border:2px solid}
+
+.rules{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+@media (max-width:760px){.rules{grid-template-columns:minmax(0,1fr)}}
+.rule{border-top:3px solid var(--line);padding-top:10px;display:grid;gap:6px}
+.rule:nth-child(1){border-color:var(--left)} .rule:nth-child(2){border-color:var(--right)} .rule:nth-child(3){border-color:var(--hot)}
+.rule b{font-family:var(--f-display);font-size:1.05rem}
+.rule p{color:var(--muted);font-size:.95rem}
+.rule code{color:var(--ink);background:var(--sunk);padding:.1em .35em;border-radius:4px}
+pre.java{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;margin:0;font-family:var(--f-mono);font-size:.82rem;line-height:1.6}
+pre.java .c{color:var(--muted)}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+@media (max-width:520px){.rung{grid-template-columns:minmax(0,1fr)}.vars b{font-size:1.2rem}}
+</style>
+
+<div class="wrap">
+  <header style="display:grid;gap:10px">
+    <span class="eyebrow">Merge sort · bottom-up only</span>
+    <h1>Pair up, merge, double. Repeat.</h1>
+    <p class="lead">Think of a knockout bracket. Every number starts as its own team of 1. Each round, neighbouring teams pair up and merge into a team twice as big. Each row below is one round. Press <b>Next step</b> and watch the code fill in with real numbers.</p>
+  </header>
+
+  <div class="bench" id="bench" tabindex="0" aria-label="Bottom-up merge sort demo">
+    <div class="toolbar">
+      <button class="btn" id="back" type="button">◀ Back</button>
+      <button class="btn primary" id="next" type="button">Next step ▶</button>
+      <button class="btn" id="play" type="button">▶ Auto-play</button>
+      <button class="btn" id="reset" type="button">↺ Start over</button>
+      <span class="sep"></span>
+      <label for="size">How many numbers
+        <select id="size"><option>4</option><option>5</option><option selected>7</option><option>8</option><option>11</option><option>13</option></select></label>
+      <button class="btn" id="shuffle" type="button">New numbers</button>
+    </div>
+    <div class="progress"><div id="prog"></div></div>
+
+    <div class="body">
+      <div style="display:grid;gap:14px;min-width:0">
+        <div class="ladder-wrap"><div class="ladder" id="ladder"></div></div>
+        <div class="legend">
+          <span><i style="border-color:var(--left);background:var(--left-soft)"></i>left pile</span>
+          <span><i style="border-color:var(--right);background:var(--right-soft)"></i>right pile</span>
+          <span><i style="border-color:var(--hot);background:var(--hot-soft)"></i>just merged</span>
+          <span><i style="border-color:var(--merged);background:var(--merged-soft)"></i>sorted pile</span>
+          <span><i style="border-color:var(--muted);background:var(--sunk);border-style:dashed"></i>no partner, waits</span>
+        </div>
+      </div>
+      <div class="side">
+        <div class="narr" id="msg"></div>
+        <div class="vars">
+          <div class="var" id="v-w"><span>width</span><b>–</b></div>
+          <div class="var" id="v-lo"><span>lo</span><b>–</b></div>
+          <div class="var" id="v-mid"><span>mid</span><b>–</b></div>
+          <div class="var" id="v-hi"><span>hi</span><b>–</b></div>
+        </div>
+        <div class="code" id="code"></div>
+      </div>
+    </div>
+  </div>
+
+  <section style="display:grid;gap:14px">
+    <h2>The only three things to remember</h2>
+    <div class="rules">
+      <div class="rule"><b>1. Width doubles</b><p><code>width = 1, 2, 4, 8…</code> is the pile size this round. Stop when <code>width &gt;= n</code>, because one pile already covers everything.</p></div>
+      <div class="rule"><b>2. A right pile must exist</b><p><code>lo &lt; n - width</code> means there's at least one item after the left pile. If not, the leftover pile has no partner and simply waits for the next round.</p></div>
+      <div class="rule"><b>3. The last pile can be short</b><p><code>hi = min(lo + 2*width - 1, n - 1)</code> stops the right pile at the end of the array instead of running past it.</p></div>
+    </div>
+    <pre class="java"><code><span class="c">// The whole thing in Java. merge() is the same one top-down uses.</span>
+static void sortBottomUp(int[] a) {
+    int n = a.length;
+    int[] aux = new int[n];
+    for (int width = 1; width &lt; n; width *= 2) {              <span class="c">// rule 1</span>
+        for (int lo = 0; lo &lt; n - width; lo += 2 * width) {    <span class="c">// rule 2</span>
+            int mid = lo + width - 1;
+            int hi  = Math.min(lo + 2 * width - 1, n - 1);     <span class="c">// rule 3</span>
+            merge(a, aux, lo, mid, hi);
+        }
+    }
+}</code></pre>
+    <p class="lead" style="font-size:.95rem">Try 7, 11 or 13 numbers. Sizes that aren't a power of 2 are where rules 2 and 3 actually matter. With 4 or 8 numbers, every pile always has a partner.</p>
+  </section>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const CODE = [
+  ['w',     '<span class="kw">for</span> (width = 1; width &lt; n; width *= 2)'],
+  ['lo',    '  <span class="kw">for</span> (lo = 0; lo &lt; n - width; lo += 2*width)'],
+  ['mid',   '    mid = lo + width - 1'],
+  ['hi',    '    hi  = min(lo + 2*width - 1, n - 1)'],
+  ['merge', '    merge(a, lo, mid, hi)'],
+];
+const S = { input:[38,27,43,3,9,82,10], frames:[], idx:0, timer:null };
+
+function build(input){
+  const n = input.length, a = input.slice(), F = [];
+  const rows = [{g:1, vals:a.slice(), st:Array(n).fill('done')}];
+  const snap = o => F.push(Object.assign({
+    rows: rows.map(r => ({g:r.g, vals:r.vals.slice(), st:r.st.slice()})),
+    w:null, lo:null, mid:null, hi:null, line:null, live:'', src:null, msg:'', justMerged:null, done:false, on:[]
+  }, o));
+  snap({msg:`Start: ${n} numbers, so ${n} piles of size 1. A pile of one number is already sorted. That's the top row.`});
+  let w = 1, p = 0;
+  for(; w < n; w *= 2, p++){
+    snap({line:'w', w, src:p, on:['w'], live:`width = ${w} → ${w} < ${n} ✓`,
+      msg:`<b>width = ${w}</b>. Is ${w} &lt; ${n}? Yes, so start a new round: merge neighbouring piles of ${w} into piles of ${2*w}.`});
+    rows.push({g:2*w, vals:a.slice(), st:Array(n).fill('wait')});
+    const tr = rows[rows.length-1];
+    let lo;
+    for(lo = 0; lo < n - w; lo += 2*w){
+      const mid = lo + w - 1, hi = Math.min(lo + 2*w - 1, n - 1);
+      const L = a.slice(lo, mid+1), R = a.slice(mid+1, hi+1);
+      snap({line:'lo', w, lo, src:p, on:['lo'], live:`lo = ${lo} → ${lo} < ${n} − ${w} = ${n-w} ✓`,
+        msg:`<b>lo = ${lo}</b>. Is ${lo} &lt; ${n-w}? Yes, so there's at least one item after the left pile. We have a pair.`});
+      snap({line:'mid', w, lo, mid, src:p, on:['mid'], live:`mid = ${lo} + ${w} − 1 = ${mid}`,
+        msg:`<b>mid = ${mid}</b>. The left pile is a[${lo}..${mid}] = [${L.join(', ')}].`});
+      const short = hi < lo + 2*w - 1;
+      snap({line:'hi', w, lo, mid, hi, src:p, on:['hi'], live:`hi = min(${lo + 2*w - 1}, ${n-1}) = ${hi}`,
+        msg: short ? `<b>hi = ${hi}</b>. ${lo + 2*w - 1} would run past the end, so min() cuts it to ${n-1}. The right pile is short, only [${R.join(', ')}]. Rule 3 in action.`
+                   : `<b>hi = ${hi}</b>. The right pile is a[${mid+1}..${hi}] = [${R.join(', ')}].`});
+      const merged = L.concat(R).sort((x,y) => x-y);
+      for(let k=lo;k<=hi;k++){ a[k] = merged[k-lo]; tr.vals[k] = a[k]; tr.st[k] = 'done'; }
+      snap({line:'merge', w, lo, mid, hi, src:p, on:[], justMerged:lo, live:`merge(a, ${lo}, ${mid}, ${hi})`,
+        msg:`Merge [${L.join(', ')}] + [${R.join(', ')}] → <b>[${merged.join(', ')}]</b>. A sorted pile of ${merged.length}.`});
+    }
+    if(lo < n){
+      for(let k=lo;k<n;k++) tr.st[k] = 'carry';
+      snap({line:'lo', w, lo, src:p, on:['lo'], live:`lo = ${lo} → ${lo} < ${n-w} ✗`,
+        msg:`<b>lo = ${lo}</b>. Is ${lo} &lt; ${n-w}? No. Only a[${lo}..${n-1}] is left, which is one pile with no right partner. It drops down unchanged and waits for a bigger round. Rule 2 in action.`});
+    } else {
+      snap({line:'lo', w, lo, src:p, on:['lo'], live:`lo = ${lo} → ${lo} < ${n-w} ✗`,
+        msg:`<b>lo = ${lo}</b>. Is ${lo} &lt; ${n-w}? No. Every pile found a partner this round. Round over.`});
+    }
+  }
+  snap({line:'w', w, on:['w'], done:true, live:`width = ${w} → ${w} < ${n} ✗`,
+    msg:`<b>width = ${w}</b>. Is ${w} &lt; ${n}? No. One pile now covers the whole array, so it's sorted: <b>[${a.join(', ')}]</b>. Took ${p} rounds (about log₂ ${n}).`});
+  return F;
+}
+
+function render(){
+  const f = S.frames[S.idx], n = S.input.length;
+  const cols = `repeat(${n}, minmax(34px, 1fr))`;
+  let html = `<div class="rung"><span></span><div class="grid idx" style="grid-template-columns:${cols}">${S.input.map((_,i)=>`<div>${i}</div>`).join('')}</div></div>`;
+  f.rows.forEach((r, ri) => {
+    const isSrc = ri === f.src, isTgt = f.src !== null && ri === f.src + 1;
+    let piles = '', tags = '';
+    for(let s=0; s<n; s+=r.g){
+      const e = Math.min(s + r.g - 1, n - 1);
+      const st = r.st.slice(s, e+1);
+      let cls = st.includes('wait') ? 'wait' : st.includes('carry') ? 'carry' : '';
+      let tag = '';
+      if(isSrc && f.lo !== null && f.lo < n - f.w){
+        if(s === f.lo && f.line !== 'w'){ cls += ' L'; tag = '<span class="l">left</span>'; }
+        if(s === f.lo + f.w && (f.line === 'hi' || f.line === 'merge' || f.line === 'mid' || f.line === 'lo')){ cls += ' R'; tag = '<span class="r">right</span>'; }
+      }
+      if(isTgt && f.justMerged === s) cls += ' new';
+      if(cls.includes('carry')) tag = '<span class="c">waits</span>';
+      if(f.done && ri === f.rows.length - 1) cls = 'final';
+      const style = `grid-column:${s+1} / ${e+2}`;
+      piles += `<div class="pile ${cls}" style="${style}">${r.vals.slice(s, e+1).map(v => `<span>${v}</span>`).join('')}</div>`;
+      tags += `<div class="tag" style="${style}">${tag}</div>`;
+    }
+    const label = ri === 0 ? `<b>start</b>piles of 1` : `<b>round ${ri}</b>width ${r.g/2} → piles of ${r.g}`;
+    html += `<div class="rung${isTgt ? ' target' : ''}"><div class="rlab">${label}</div><div style="display:grid;gap:2px;min-width:0"><div class="grid" style="grid-template-columns:${cols}">${piles}</div><div class="grid" style="grid-template-columns:${cols}">${tags}</div></div></div>`;
+  });
+  $('#ladder').innerHTML = html;
+
+  $('#code').innerHTML = CODE.map(([id, t]) => `<div class="${f.line === id ? 'on' : ''}">${t}${f.line === id ? `<span class="live">${f.live.replace(/</g,'&lt;')}</span>` : ''}</div>`).join('');
+  [['w','w'],['lo','lo'],['mid','mid'],['hi','hi']].forEach(([k, id]) => {
+    const el = $('#v-' + id);
+    el.querySelector('b').textContent = f[k] === null ? '–' : f[k];
+    el.classList.toggle('on', f.on.includes(k));
+  });
+  $('#msg').innerHTML = f.msg;
+  $('#prog').style.width = (S.idx / (S.frames.length - 1) * 100) + '%';
+  $('#next').disabled = S.idx >= S.frames.length - 1;
+  $('#back').disabled = S.idx === 0;
+  $('#play').textContent = S.timer ? '⏸ Pause' : '▶ Auto-play';
+}
+
+function stop(){ clearTimeout(S.timer); S.timer = null; }
+function go(d){ stop(); S.idx = Math.max(0, Math.min(S.frames.length - 1, S.idx + d)); render(); }
+function tick(){ if(S.idx < S.frames.length - 1){ S.idx++; render(); S.timer = setTimeout(tick, 1300); } else { stop(); render(); } }
+function load(){ stop(); S.frames = build(S.input); S.idx = 0; render(); }
+
+$('#next').onclick = () => go(1);
+$('#back').onclick = () => go(-1);
+$('#reset').onclick = () => { stop(); S.idx = 0; render(); };
+$('#play').onclick = () => { if(S.timer){ stop(); render(); } else { if(S.idx >= S.frames.length - 1) S.idx = 0; S.timer = setTimeout(tick, 200); render(); } };
+$('#shuffle').onclick = () => { S.input = Array.from({length:+$('#size').value}, () => 1 + Math.floor(Math.random()*99)); load(); };
+$('#size').onchange = () => $('#shuffle').click();
+$('#bench').addEventListener('keydown', e => {
+  if(e.target.closest('select')) return;
+  if(e.key === 'ArrowRight'){ e.preventDefault(); go(1); }
+  if(e.key === 'ArrowLeft'){ e.preventDefault(); go(-1); }
+});
+load();
+</script>

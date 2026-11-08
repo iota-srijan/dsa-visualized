@@ -1,0 +1,1426 @@
+<title>Merge Sort Walkthrough</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one reading column (~70ch) that widens to a full-width lab bench for each animation. */
+:root{
+  --bg:#F1F3F6; --surface:#FFFFFF; --sunk:#E7EBF0; --ink:#131B25; --muted:#576373; --line:#D3D9E1;
+  --left:#4A54CF; --right:#B8720C; --merged:#1F8A55; --hot:#CF3463;
+  --left-soft:#E2E4FA; --right-soft:#F6E7CF; --merged-soft:#D5EFE1; --hot-soft:#F9DAE3;
+  --code-bg:#F7F8FA; --tk-kw:#7A2FB8; --tk-str:#1F7A4A; --tk-com:#7A8594; --tk-num:#B35A00; --tk-fn:#2550C0; --tk-cls:#A0306A;
+  --f-display:'Familjen Grotesk','Segoe UI',system-ui,sans-serif;
+  --f-body:'Atkinson Hyperlegible','Segoe UI',system-ui,sans-serif;
+  --f-mono:'JetBrains Mono',ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0C1117; --surface:#141B24; --sunk:#1B2430; --ink:#E4E9EF; --muted:#93A0AF; --line:#2A3441;
+  --left:#8D95FF; --right:#ECA944; --merged:#52C889; --hot:#FF6B93;
+  --left-soft:#232853; --right-soft:#3B2C12; --merged-soft:#153626; --hot-soft:#431828;
+  --code-bg:#10161E; --tk-kw:#C79BFF; --tk-str:#7FD6A2; --tk-com:#6F7C8C; --tk-num:#F2B266; --tk-fn:#86A9FF; --tk-cls:#F59BC6;
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0C1117; --surface:#141B24; --sunk:#1B2430; --ink:#E4E9EF; --muted:#93A0AF; --line:#2A3441;
+  --left:#8D95FF; --right:#ECA944; --merged:#52C889; --hot:#FF6B93;
+  --left-soft:#232853; --right-soft:#3B2C12; --merged-soft:#153626; --hot-soft:#431828;
+  --code-bg:#10161E; --tk-kw:#C79BFF; --tk-str:#7FD6A2; --tk-com:#6F7C8C; --tk-num:#F2B266; --tk-fn:#86A9FF; --tk-cls:#F59BC6;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:17px;line-height:1.6;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 64px}
+.wrap{max-width:1120px;margin:0 auto}
+.prose{max-width:70ch}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;line-height:1.15;margin:0}
+h1{font-size:clamp(2.4rem,6vw,4rem);font-weight:700;letter-spacing:-.02em}
+h2{font-size:clamp(1.6rem,3.4vw,2.1rem);font-weight:700;letter-spacing:-.01em}
+h3{font-size:1.2rem;font-weight:600}
+p{margin:0}
+code,kbd{font-family:var(--f-mono);font-size:.86em}
+:not(pre)>code{background:var(--sunk);padding:.1em .35em;border-radius:4px}
+a{color:var(--left)}
+section{padding-block:56px 8px;display:grid;gap:18px}
+.eyebrow{font-family:var(--f-mono);font-size:.74rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.lead{font-size:1.15rem;color:var(--muted)}
+.stack{display:grid;gap:14px}
+
+/* hero */
+header.hero{padding-block:56px 8px;display:grid;gap:22px}
+.hero h1 .split{color:var(--left)} .hero h1 .merge{color:var(--merged)}
+.dcc{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;max-width:820px}
+.dcc div{border-top:3px solid var(--line);padding-top:10px}
+.dcc div:nth-child(1){border-color:var(--left)} .dcc div:nth-child(2){border-color:var(--right)} .dcc div:nth-child(3){border-color:var(--merged)}
+.dcc b{font-family:var(--f-display);font-size:1.05rem;display:block}
+.dcc span{color:var(--muted);font-size:.95rem}
+.toc{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:.95rem;padding:0;margin:0;list-style:none}
+.toc a{color:var(--muted);text-decoration:none;border-bottom:1px solid var(--line)}
+.toc a:hover{color:var(--ink);border-color:var(--ink)}
+.toc .lvl{font-family:var(--f-mono);font-size:.72rem;color:var(--muted);margin-right:4px}
+
+/* mapping list */
+.map{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:0;padding:16px 18px;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+.map dt{font-weight:700}
+.map dd{margin:0;color:var(--muted)}
+.map dd code{color:var(--ink)}
+
+/* buttons */
+button,select,input[type=text]{font:inherit;font-size:.92rem;color:var(--ink)}
+.btn{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;line-height:1.2}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink);min-width:86px;justify-content:center}
+.btn:focus-visible,select:focus-visible,input:focus-visible,.viz:focus-visible,summary:focus-visible{outline:2px solid var(--left);outline-offset:2px}
+select,input[type=text]{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:7px 10px}
+input[type=range]{accent-color:var(--left)}
+
+/* lab bench panels */
+.bench{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;display:grid;gap:16px}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.toolbar .sep{width:1px;height:26px;background:var(--line);margin-inline:4px}
+.toolbar label{font-size:.85rem;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
+.narr{background:var(--sunk);border-radius:10px;padding:12px 14px;min-height:3.4em;font-size:1rem}
+.narr b{font-family:var(--f-mono);font-weight:600}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.82rem;color:var(--muted)}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+
+/* merge demo cards */
+.piles{display:grid;gap:12px}
+.pile{display:grid;grid-template-columns:92px 1fr;gap:12px;align-items:center}
+.pile .lab{font-family:var(--f-mono);font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.cards{display:flex;gap:8px;flex-wrap:wrap;min-height:58px;align-items:center}
+.card{width:46px;height:58px;border-radius:7px;border:1.5px solid var(--line);display:grid;place-items:center;font-family:var(--f-mono);font-weight:600;font-size:1.05rem;background:var(--surface);transition:transform .25s,opacity .25s,background .25s,border-color .25s}
+.card.L{background:var(--left-soft);border-color:var(--left)}
+.card.R{background:var(--right-soft);border-color:var(--right)}
+.card.O{background:var(--merged-soft);border-color:var(--merged)}
+.card.gone{opacity:.22;border-style:dashed}
+.card.top{transform:translateY(-6px);box-shadow:0 4px 0 -1px var(--ink)}
+.card.cmp{border-color:var(--hot);box-shadow:0 0 0 3px var(--hot-soft)}
+.card.new{animation:pop .35s ease}
+.card.slot{border-style:dashed;background:transparent;color:var(--muted);font-weight:400}
+@keyframes pop{from{transform:scale(.6);opacity:.2}to{transform:none;opacity:1}}
+
+/* full visualizer */
+.viz{outline:none}
+.viz-body{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:18px}
+@media (max-width:880px){.viz-body{grid-template-columns:minmax(0,1fr)}}
+.stage{display:grid;gap:4px;overflow-x:auto;padding-bottom:4px}
+.row{display:grid;gap:4px;min-width:0}
+.bars{height:190px;align-items:end}
+.col{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;min-width:0}
+.col .v{font-family:var(--f-mono);font-size:.78rem;font-weight:600;margin-bottom:3px;font-variant-numeric:tabular-nums}
+.bar{width:100%;border-radius:5px 5px 2px 2px;background:var(--line);transition:height .25s,background .2s,opacity .2s}
+.col.out .bar{opacity:.28} .col.out .v{opacity:.4}
+.col.A .bar{background:var(--muted)}
+.col.L .bar{background:var(--left)} .col.R .bar{background:var(--right)}
+.col.M .bar{background:var(--merged)} .col.stale .bar{background:var(--line);opacity:.55} .col.stale .v{opacity:.35}
+.col.sorted .bar{background:var(--merged)}
+.col.wk .bar{box-shadow:0 0 0 3px var(--hot-soft),0 0 0 1.5px var(--hot) inset}
+.idx{font-family:var(--f-mono);font-size:.7rem;color:var(--muted);text-align:center}
+.idx div{border-top:1px solid var(--line);padding-top:2px}
+.idx div.split{border-left:2px solid var(--ink)}
+.mk{font-family:var(--f-mono);font-size:.78rem;font-weight:600;text-align:center;height:1.3em}
+.mk .k{color:var(--hot)} .mk .i{color:var(--left)} .mk .j{color:var(--right)}
+.auxlab{font-family:var(--f-mono);font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:8px}
+.aux .cell{height:34px;border-radius:6px;border:1.5px dashed var(--line);display:grid;place-items:center;font-family:var(--f-mono);font-size:.82rem;font-weight:600;font-variant-numeric:tabular-nums;color:var(--muted)}
+.aux .cell.L{border:1.5px solid var(--left);background:var(--left-soft);color:var(--ink)}
+.aux .cell.R{border:1.5px solid var(--right);background:var(--right-soft);color:var(--ink)}
+.aux .cell.used{opacity:.25}
+.aux .cell.top{box-shadow:0 3px 0 -1px var(--ink)}
+.aux .cell.cmp{border-color:var(--hot);box-shadow:0 0 0 3px var(--hot-soft)}
+.aux .cell.empty{border-color:transparent}
+
+.tree-wrap{overflow-x:auto}
+.tree{display:grid;gap:8px 4px}
+.node{border:1.5px solid var(--line);border-radius:7px;display:flex;justify-content:space-around;padding:3px 2px;font-family:var(--f-mono);font-size:.72rem;color:var(--muted);background:var(--bg);min-width:0;transition:background .2s,border-color .2s}
+.node span{min-width:0;text-align:center;flex:1}
+.node.done{border-color:var(--merged);background:var(--merged-soft);color:var(--ink)}
+.node.open{border-color:var(--muted);color:var(--ink)}
+.node.active{border-color:var(--hot);background:var(--hot-soft);color:var(--ink);box-shadow:0 0 0 2px var(--hot-soft)}
+.tree-cap{display:flex;justify-content:space-between;gap:10px;font-size:.82rem;color:var(--muted);flex-wrap:wrap}
+
+.side{display:grid;gap:14px;align-content:start;min-width:0}
+.pc{background:var(--code-bg);border:1px solid var(--line);border-radius:10px;padding:10px 0;font-family:var(--f-mono);font-size:.8rem;line-height:1.55;overflow-x:auto}
+.pc div{padding:0 12px;white-space:pre;border-left:3px solid transparent}
+.pc div.on{background:var(--hot-soft);border-left-color:var(--hot)}
+.pc .c{color:var(--tk-com)}
+.pc .ln{display:inline-block;width:2.2ch;color:var(--tk-com);opacity:.7;user-select:none}
+.box{border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.box h4{margin:0 0 6px;font-family:var(--f-mono);font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.callstack{display:flex;flex-direction:column-reverse;gap:4px;font-family:var(--f-mono);font-size:.78rem}
+.callstack div{padding:3px 8px;border-radius:5px;background:var(--sunk)}
+.callstack div:last-child{background:var(--hot-soft);color:var(--ink);font-weight:600}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
+.stats b{display:block;font-family:var(--f-display);font-size:1.4rem;font-variant-numeric:tabular-nums}
+.stats span{font-size:.75rem;color:var(--muted)}
+.scrub{width:100%}
+.err{color:var(--hot);font-size:.85rem}
+
+/* code */
+.tabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--line)}
+.tab{background:none;border:none;border-bottom:2px solid transparent;padding:8px 12px;cursor:pointer;color:var(--muted);font-weight:700}
+.tab[aria-selected="true"]{color:var(--ink);border-color:var(--left)}
+.codebox{position:relative}
+pre.code{background:var(--code-bg);border:1px solid var(--line);border-radius:10px;padding:16px 18px;overflow-x:auto;margin:0;font-family:var(--f-mono);font-size:.82rem;line-height:1.6;color:var(--ink)}
+pre.code code{font-size:inherit;background:none;padding:0}
+.copy{position:absolute;top:8px;right:8px;font-size:.78rem;padding:4px 9px}
+.token.keyword,.token.boolean{color:var(--tk-kw)}
+.token.string,.token.char{color:var(--tk-str)}
+.token.comment{color:var(--tk-com);font-style:italic}
+.token.number{color:var(--tk-num)}
+.token.function{color:var(--tk-fn)}
+.token.class-name{color:var(--tk-cls)}
+.token.operator,.token.punctuation{color:var(--muted)}
+.note{font-size:.95rem;color:var(--muted)}
+
+/* complexity */
+.levels{display:grid;gap:8px}
+.lvl{display:grid;grid-template-columns:minmax(0,1fr) 120px;gap:12px;align-items:center}
+.blocks{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:3px}
+.blk{height:30px;border-radius:5px;background:var(--merged-soft);border:1.5px solid var(--merged);display:grid;place-items:center;font-family:var(--f-mono);font-size:.74rem}
+.lvl .w{font-family:var(--f-mono);font-size:.8rem;color:var(--muted)}
+.calc{display:grid;gap:12px}
+.hbar{display:grid;grid-template-columns:150px minmax(0,1fr);gap:10px;align-items:center;font-size:.88rem}
+.hbar .track{height:18px;background:var(--sunk);border-radius:4px;overflow:hidden}
+.hbar .fill{height:100%;border-radius:4px;min-width:2px;transition:width .3s}
+.nums{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.nums div{border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.nums b{font-family:var(--f-display);font-size:1.25rem;display:block;font-variant-numeric:tabular-nums}
+.nums span{font-size:.8rem;color:var(--muted)}
+
+/* stability */
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{border:1.5px solid var(--line);border-radius:8px;padding:5px 10px;font-size:.9rem;background:var(--bg);display:grid;line-height:1.25}
+.chip b{font-family:var(--f-mono)}
+.chip small{color:var(--muted);font-size:.72rem}
+.chip.g72{border-color:var(--left)} .chip.g85{border-color:var(--right)}
+.verdict{font-size:.95rem}
+.ok{color:var(--merged);font-weight:700} .bad{color:var(--hot);font-weight:700}
+
+/* table */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:680px;font-size:.92rem}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--f-display);font-size:.95rem;background:var(--sunk)}
+tr:last-child td{border-bottom:none}
+td.hl{font-weight:700}
+
+/* gotcha */
+.gotcha{border:2px solid var(--hot);border-radius:14px;padding:20px;background:var(--surface);display:grid;gap:14px}
+.vs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (max-width:720px){.vs{grid-template-columns:minmax(0,1fr)}.dcc{grid-template-columns:minmax(0,1fr)}}
+.vs .tag{font-family:var(--f-mono);font-size:.74rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
+.traps{display:grid;gap:10px;margin:0;padding-left:1.2em}
+
+/* quiz */
+details{border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:12px 16px}
+details summary{cursor:pointer;font-weight:700}
+details[open] summary{margin-bottom:8px}
+details p{color:var(--muted)}
+
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+@media (max-width:520px){.pile{grid-template-columns:minmax(0,1fr)}.card{width:40px;height:52px}.hbar{grid-template-columns:minmax(0,1fr)}.lvl{grid-template-columns:minmax(0,1fr)}.bars{height:150px}}
+
+/* ===== annotations + notebook ===== */
+mark.anno{color:inherit;border-radius:3px;padding:0 1px;cursor:pointer;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+mark.anno[data-c="y"]{background:var(--right-soft);box-shadow:inset 0 -2px 0 var(--right)}
+mark.anno[data-c="g"]{background:var(--merged-soft);box-shadow:inset 0 -2px 0 var(--merged)}
+mark.anno[data-c="p"]{background:var(--hot-soft);box-shadow:inset 0 -2px 0 var(--hot)}
+mark.anno[data-c="b"]{background:var(--left-soft);box-shadow:inset 0 -2px 0 var(--left)}
+mark.anno.has-note::after{content:"✎";font-size:.7em;vertical-align:super;color:var(--muted);margin-left:1px}
+mark.anno.flash{animation:annoflash 1.2s ease 2}
+@keyframes annoflash{50%{outline:3px solid var(--hot);outline-offset:2px}}
+.nb-pop{position:absolute;z-index:60;display:flex;gap:6px;align-items:center;background:var(--ink);color:var(--bg);border-radius:10px;padding:6px 8px;box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:.85rem}
+.nb-pop button{background:none;border:none;color:var(--bg);cursor:pointer;font:inherit;padding:4px 6px;border-radius:6px}
+.nb-pop button:hover{background:color-mix(in srgb,var(--bg) 18%,transparent)}
+.nb-sw{width:20px;height:20px;border-radius:50%;padding:0!important;border:2px solid var(--bg)!important}
+.nb-sw[data-c="y"]{background:var(--right)!important}.nb-sw[data-c="g"]{background:var(--merged)!important}
+.nb-sw[data-c="p"]{background:var(--hot)!important}.nb-sw[data-c="b"]{background:var(--left)!important}
+.nb-sw.on{outline:2px solid var(--bg);outline-offset:2px}
+.nb-pop .sep{width:1px;height:18px;background:color-mix(in srgb,var(--bg) 35%,transparent)}
+.nb-edit{position:absolute;z-index:61;width:min(340px,calc(100vw - 32px));background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.22);padding:12px;display:grid;gap:8px}
+.nb-edit blockquote{margin:0;padding:6px 10px;border-left:3px solid var(--line);color:var(--muted);font-size:.85rem;max-height:5.5em;overflow:auto}
+.nb-edit textarea,#nb-text{width:100%;font:inherit;font-size:.92rem;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;resize:vertical}
+.nb-edit textarea{min-height:80px}
+.nb-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.nb-row .grow{flex:1}
+.nb-edit .nb-sw{border-color:var(--surface)!important}
+.nb-fab{position:fixed;right:max(18px,env(safe-area-inset-right,0px));bottom:max(18px,env(safe-area-inset-bottom,0px));z-index:55;background:var(--ink);color:var(--bg);border:none;border-radius:999px;padding:11px 18px;font:inherit;font-weight:700;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.25);display:flex;gap:8px;align-items:center}
+.nb-fab .ct{background:var(--hot);color:#fff;border-radius:999px;font-size:.75rem;padding:0 7px}
+#nb{position:fixed;top:0;right:0;bottom:0;z-index:58;width:min(400px,100vw);background:var(--surface);border-left:1px solid var(--line);box-shadow:-12px 0 32px rgba(0,0,0,.15);display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;padding-top:env(safe-area-inset-top,0px);padding-right:env(safe-area-inset-right,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.nb-head{display:flex;align-items:center;gap:10px;padding:14px 16px 8px}
+.nb-head h2{font-size:1.25rem;flex:1}
+.nb-status{font-size:.75rem;color:var(--muted);padding:0 16px 8px}
+.nb-status.bad{color:var(--hot)}
+.nb-tabs{display:flex;gap:4px;padding:0 12px;border-bottom:1px solid var(--line)}
+.nb-tabs button{background:none;border:none;border-bottom:2px solid transparent;padding:8px 10px;font:inherit;font-weight:700;color:var(--muted);cursor:pointer}
+.nb-tabs button[aria-selected="true"]{color:var(--ink);border-color:var(--left)}
+.nb-body{overflow:auto;padding:12px 16px;display:grid;align-content:start;gap:10px}
+#nb-text{min-height:calc(100vh - 260px);font-family:var(--f-body);line-height:1.6}
+.nb-item{border:1px solid var(--line);border-left:4px solid var(--line);border-radius:8px;padding:8px 10px;display:grid;gap:4px;font-size:.88rem}
+.nb-item[data-c="y"]{border-left-color:var(--right)}.nb-item[data-c="g"]{border-left-color:var(--merged)}
+.nb-item[data-c="p"]{border-left-color:var(--hot)}.nb-item[data-c="b"]{border-left-color:var(--left)}
+.nb-item q{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;color:var(--muted)}
+.nb-item .n{white-space:pre-wrap}
+.nb-item .lost{color:var(--hot);font-size:.78rem}
+.nb-empty{color:var(--muted);font-size:.9rem}
+.nb-foot{display:flex;gap:8px;padding:10px 16px;border-top:1px solid var(--line);flex-wrap:wrap;align-items:center}
+.nb-x{background:none;border:1px solid var(--line);border-radius:8px;padding:4px 10px;cursor:pointer;font:inherit;color:var(--ink)}
+@media (min-width:1180px){body.nb-open{padding-right:calc(400px + 16px)}}
+@media print{.nb-ui{display:none!important}}
+</style>
+
+<div class="wrap">
+
+<header class="hero">
+  <span class="eyebrow">Sorting algorithms · from zero to interview-ready</span>
+  <h1><span class="split">Split</span> until it's trivial.<br><span class="merge">Merge</span> your way back up.</h1>
+  <p class="lead prose">Merge sort in one page: an analogy you can't forget, two animations you can step through line by line, the pseudocode, clean Java, and the advanced stuff interviewers ask about.</p>
+  <div class="dcc">
+    <div><b>Divide</b><span>Cut the array in half, again and again, until every piece has one item.</span></div>
+    <div><b>Conquer</b><span>A one-item piece is already sorted. Nothing to do.</span></div>
+    <div><b>Combine</b><span>Merge two sorted pieces into one sorted piece. This is where the real work happens.</span></div>
+  </div>
+  <ul class="toc">
+    <li><a href="#idea"><span class="lvl">BASIC</span>The idea</a></li>
+    <li><a href="#merge"><span class="lvl">BASIC</span>The merge step</a></li>
+    <li><a href="#full"><span class="lvl">BASIC</span>Full animation</a></li>
+    <li><a href="#pseudo"><span class="lvl">CORE</span>Pseudocode</a></li>
+    <li><a href="#code"><span class="lvl">CORE</span>Java code</a></li>
+    <li><a href="#cost"><span class="lvl">CORE</span>Why n log n</a></li>
+    <li><a href="#stable"><span class="lvl">ADV</span>Stability</a></li>
+    <li><a href="#tuning"><span class="lvl">ADV</span>Bottom-up &amp; tuning</a></li>
+    <li><a href="#compare"><span class="lvl">ADV</span>vs other sorts</a></li>
+    <li><a href="#gotcha"><span class="lvl">!</span>The gotcha</a></li>
+    <li><a href="#quiz"><span class="lvl">TEST</span>Quiz yourself</a></li>
+  </ul>
+</header>
+
+<!-- 1. IDEA -->
+<section id="idea">
+  <span class="eyebrow">Part 1 · Basics</span>
+  <h2>Sorting a stack of exam papers with helpers</h2>
+  <div class="prose stack">
+    <p>A teacher has 8 shuffled exam papers and wants them in order of marks. Sorting 8 at once is annoying. So the teacher splits the stack in half and hands each half to a helper.</p>
+    <p>Each helper follows the same rule: if your stack has more than one paper, split it and hand the halves to two more helpers. Someone handed a single paper just hands it straight back, because one paper is already "sorted".</p>
+    <p>Now the papers come back up the chain. Whenever you get two <em>sorted</em> stacks back, you combine them: look at the top paper of each stack, take the smaller one, place it on your output pile, and repeat. Because both stacks are already sorted, the smallest remaining paper is always on one of the two tops. You never need to look deeper.</p>
+    <p>That's the whole algorithm. Splitting is easy and dumb. Merging is where the order gets built.</p>
+  </div>
+  <dl class="map prose">
+    <dt>A stack of papers</dt><dd>a subarray <code>a[lo..hi]</code></dd>
+    <dt>Handing halves to helpers</dt><dd>the two recursive calls <code>mergeSort(lo, mid)</code> and <code>mergeSort(mid+1, hi)</code></dd>
+    <dt>"One paper is already sorted"</dt><dd>the <strong>base case</strong> <code>if (lo &gt;= hi) return;</code></dd>
+    <dt>Combining two sorted stacks</dt><dd>the <code>merge()</code> function</dd>
+    <dt>Your finger on each top paper</dt><dd>the pointers <code>i</code> (left stack) and <code>j</code> (right stack)</dd>
+    <dt>The next spot on the output pile</dt><dd>the write pointer <code>k</code></dd>
+    <dt>The desk space you spread papers on</dt><dd>the <strong>auxiliary array</strong> <code>aux[]</code>, which is why merge sort needs O(n) extra memory</dd>
+  </dl>
+</section>
+
+<!-- 2. MERGE STEP -->
+<section id="merge">
+  <span class="eyebrow">Part 1 · Basics</span>
+  <h2>Slow motion: merging two sorted piles</h2>
+  <p class="prose">Master this one step and the rest of merge sort is just recursion. Each round: compare the two top cards, move the smaller one to the output. When one pile runs out, the other pile's leftovers go straight across, since they're already in order.</p>
+  <div class="bench" id="md">
+    <div class="toolbar">
+      <button class="btn" id="md-reset" type="button">↺ Reset</button>
+      <button class="btn" id="md-back" type="button">◀ Back</button>
+      <button class="btn primary" id="md-play" type="button">▶ Play</button>
+      <button class="btn" id="md-step" type="button">Step ▶</button>
+      <span class="sep"></span>
+      <button class="btn" id="md-new" type="button">New piles</button>
+    </div>
+    <div class="piles">
+      <div class="pile"><span class="lab">Left pile</span><div class="cards" id="md-L"></div></div>
+      <div class="pile"><span class="lab">Right pile</span><div class="cards" id="md-R"></div></div>
+      <div class="pile"><span class="lab">Output</span><div class="cards" id="md-O"></div></div>
+    </div>
+    <div class="narr" id="md-msg"></div>
+    <div class="legend"><span><i style="background:var(--hot)"></i>being compared</span><span><i style="background:var(--ink)"></i>raised card = current top (i or j)</span><span><i style="background:var(--merged)"></i>placed in output</span></div>
+  </div>
+  <p class="note prose">Count the comparisons: merging piles of size p and q takes at most p + q − 1 comparisons. Every card is touched once. That's why one merge is <strong>linear</strong>, O(n).</p>
+</section>
+
+<!-- 3. FULL VISUALIZER -->
+<section id="full">
+  <span class="eyebrow">Part 1 · Basics</span>
+  <h2>The whole algorithm, line by line</h2>
+  <p class="prose">Every step below lights up the pseudocode line that's running, the call stack (which helper is working), and the recursion tree. Use <kbd>←</kbd> <kbd>→</kbd> and <kbd>Space</kbd> after clicking the panel. Try the bottom-up mode once you understand top-down.</p>
+  <div class="bench viz" id="viz" tabindex="0" aria-label="Merge sort visualizer">
+    <div class="toolbar">
+      <button class="btn" id="v-reset" type="button">↺ Reset</button>
+      <button class="btn" id="v-back" type="button">◀ Back</button>
+      <button class="btn primary" id="v-play" type="button">▶ Play</button>
+      <button class="btn" id="v-step" type="button">Step ▶</button>
+      <label for="v-speed">Speed <input type="range" id="v-speed" min="0" max="7" value="3"></label>
+      <span class="sep"></span>
+      <label for="v-mode">Mode
+        <select id="v-mode"><option value="td">Top-down (recursive)</option><option value="bu">Bottom-up (loops)</option></select></label>
+      <label for="v-size">Size
+        <select id="v-size"><option>6</option><option selected>8</option><option>11</option><option>16</option></select></label>
+      <button class="btn" id="v-shuffle" type="button">Shuffle</button>
+    </div>
+    <div class="toolbar">
+      <label for="v-input">Your own numbers</label>
+      <input type="text" id="v-input" placeholder="e.g. 38 27 43 3 9 82 10" style="flex:1;min-width:180px;max-width:360px">
+      <button class="btn" id="v-use" type="button">Use these</button>
+      <span class="err" id="v-err"></span>
+    </div>
+    <input type="range" class="scrub" id="v-scrub" min="0" max="0" value="0" aria-label="Timeline">
+    <div class="viz-body">
+      <div class="stack" style="min-width:0">
+        <div class="stage" id="v-stage"></div>
+        <div class="narr" id="v-msg"></div>
+        <div class="legend"><span><i style="background:var(--left)"></i>left half</span><span><i style="background:var(--right)"></i>right half</span><span><i style="background:var(--merged)"></i>merged / sorted</span><span><i style="background:var(--muted)"></i>current call's range</span><span><i style="background:var(--hot)"></i>being written (k)</span></div>
+        <div class="tree-cap"><b id="v-treetitle">Recursion tree</b><span id="v-treehint"></span></div>
+        <div class="tree-wrap"><div class="tree" id="v-tree"></div></div>
+      </div>
+      <div class="side">
+        <div class="pc" id="v-pc" aria-label="Pseudocode"></div>
+        <div class="box"><h4>Call stack (top = running now)</h4><div class="callstack" id="v-stack"></div></div>
+        <div class="box stats">
+          <div><b id="v-n-step">0</b><span>step</span></div>
+          <div><b id="v-n-cmp">0</b><span>comparisons</span></div>
+          <div><b id="v-n-wr">0</b><span>writes to a[]</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 4. PSEUDOCODE -->
+<section id="pseudo">
+  <span class="eyebrow">Part 2 · Core</span>
+  <h2>The pseudocode, and how to remember it</h2>
+  <div class="prose stack">
+    <p>Two functions. <code>mergeSort</code> only splits and delegates. <code>merge</code> does the sorting work. If you can write <code>merge</code> from memory, you can write the whole thing.</p>
+  </div>
+  <div class="codebox prose" style="max-width:none">
+<pre class="code"><code>mergeSort(a, lo, hi):                 // sort a[lo..hi], both ends included
+    if lo &gt;= hi: return               // 0 or 1 item: already sorted (base case)
+    mid = lo + (hi - lo) / 2          // split point
+    mergeSort(a, lo, mid)             // helper 1 sorts the left half
+    mergeSort(a, mid + 1, hi)         // helper 2 sorts the right half
+    merge(a, lo, mid, hi)             // combine two sorted halves
+
+merge(a, lo, mid, hi):
+    copy a[lo..hi] into aux[lo..hi]   // spread both piles on the desk
+    i = lo                            // top of left pile  (aux[lo..mid])
+    j = mid + 1                       // top of right pile (aux[mid+1..hi])
+    for k = lo to hi:                 // fill output slots left to right
+        if i &gt; mid:            a[k] = aux[j]; j++    // left pile empty
+        else if j &gt; hi:        a[k] = aux[i]; i++    // right pile empty
+        else if aux[j] &lt; aux[i]: a[k] = aux[j]; j++  // right top strictly smaller
+        else:                  a[k] = aux[i]; i++    // left top smaller OR tie</code></pre>
+  </div>
+  <dl class="map prose">
+    <dt>Memory hook</dt><dd><strong>"Split, split, stitch."</strong> Two recursive calls, then one merge.</dd>
+    <dt>Merge's 4 cases</dt><dd><strong>"Left empty, right empty, right smaller, else left."</strong> Check the empty piles first, or you'll read past the end.</dd>
+    <dt>Recurrence</dt><dd><code>T(n) = 2·T(n/2) + n</code>: two half-size problems plus a linear merge, which solves to <code>O(n log n)</code>.</dd>
+  </dl>
+</section>
+
+<!-- 5. CODE -->
+<section id="code">
+  <span class="eyebrow">Part 2 · Core</span>
+  <h2>Java, from clean to production-grade</h2>
+  <p class="prose">Start with <b>Classic</b>. It's what you should be able to write on a whiteboard. The other tabs build on it.</p>
+  <div class="stack">
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" aria-selected="true" data-tab="c1" type="button">Classic</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="c2" type="button">Bottom-up</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="c3" type="button">Optimized</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="c4" type="button">Generic (any object)</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="c5" type="button">Count inversions</button>
+    </div>
+
+<div class="codebox" data-panel="c1">
+<button class="btn copy" type="button">Copy</button>
+<pre class="code"><code class="language-java">import java.util.Arrays;
+
+public class MergeSort {
+
+    // Entry point: sorts the whole array.
+    public static void sort(int[] a) {
+        int[] aux = new int[a.length];   // one desk, reused by every merge
+        sort(a, aux, 0, a.length - 1);
+    }
+
+    // Sort a[lo..hi] (both ends inclusive).
+    private static void sort(int[] a, int[] aux, int lo, int hi) {
+        if (lo &gt;= hi) return;            // one paper: already sorted
+        int mid = lo + (hi - lo) / 2;    // split the stack (overflow-safe)
+        sort(a, aux, lo, mid);           // helper 1: left half
+        sort(a, aux, mid + 1, hi);       // helper 2: right half
+        merge(a, aux, lo, mid, hi);      // you: stitch them together
+    }
+
+    // a[lo..mid] and a[mid+1..hi] are each sorted. Make a[lo..hi] sorted.
+    private static void merge(int[] a, int[] aux, int lo, int mid, int hi) {
+        for (int k = lo; k &lt;= hi; k++) aux[k] = a[k];   // spread piles on the desk
+
+        int i = lo;          // finger on top of the left pile
+        int j = mid + 1;     // finger on top of the right pile
+        for (int k = lo; k &lt;= hi; k++) {                  // fill output slots
+            if      (i &gt; mid)          a[k] = aux[j++];   // left pile empty
+            else if (j &gt; hi)           a[k] = aux[i++];   // right pile empty
+            else if (aux[j] &lt; aux[i])  a[k] = aux[j++];   // right top is smaller
+            else                       a[k] = aux[i++];   // left smaller or tie (stable)
+        }
+    }
+
+    public static void main(String[] args) {
+        int[] a = {38, 27, 43, 3, 9, 82, 10};
+        sort(a);
+        System.out.println(Arrays.toString(a));  // [3, 9, 10, 27, 38, 43, 82]
+    }
+}</code></pre>
+</div>
+
+<div class="codebox" data-panel="c2" hidden>
+<button class="btn copy" type="button">Copy</button>
+<pre class="code"><code class="language-java">// No recursion. Start with n piles of size 1, then merge neighbours:
+// size 1 -&gt; 2 -&gt; 4 -&gt; 8 ... until one pile is left.
+public static void sortBottomUp(int[] a) {
+    int n = a.length;
+    int[] aux = new int[n];
+    for (int width = 1; width &lt; n; width *= 2) {             // current pile size
+        for (int lo = 0; lo &lt; n - width; lo += 2 * width) {   // pair up neighbours
+            int mid = lo + width - 1;                         // end of left pile
+            int hi  = Math.min(lo + 2 * width - 1, n - 1);    // last pile may be short
+            merge(a, aux, lo, mid, hi);                       // same merge as Classic
+        }
+    }
+}
+// Same O(n log n) time and O(n) space, but no call stack.
+// The condition lo &lt; n - width skips a lonely last pile with no partner;
+// it just waits for a later, wider pass.</code></pre>
+</div>
+
+<div class="codebox" data-panel="c3" hidden>
+<button class="btn copy" type="button">Copy</button>
+<pre class="code"><code class="language-java">public class MergeSortFast {
+    private static final int CUTOFF = 7;   // below this size, insertion sort wins
+
+    public static void sort(int[] a) {
+        int[] aux = new int[a.length];     // allocate ONCE, never inside recursion
+        sort(a, aux, 0, a.length - 1);
+    }
+
+    private static void sort(int[] a, int[] aux, int lo, int hi) {
+        // 1. Tiny piles: recursion overhead costs more than it saves.
+        if (hi - lo + 1 &lt;= CUTOFF) { insertionSort(a, lo, hi); return; }
+
+        int mid = lo + (hi - lo) / 2;
+        sort(a, aux, lo, mid);
+        sort(a, aux, mid + 1, hi);
+
+        // 2. Already in order? Biggest of left &lt;= smallest of right: skip the merge.
+        //    Makes already-sorted input run in O(n).
+        if (a[mid] &lt;= a[mid + 1]) return;
+
+        merge(a, aux, lo, mid, hi);
+    }
+
+    private static void insertionSort(int[] a, int lo, int hi) {
+        for (int i = lo + 1; i &lt;= hi; i++) {
+            int x = a[i];
+            int j = i - 1;
+            while (j &gt;= lo &amp;&amp; a[j] &gt; x) { a[j + 1] = a[j]; j--; }   // strict &gt; keeps it stable
+            a[j + 1] = x;
+        }
+    }
+
+    private static void merge(int[] a, int[] aux, int lo, int mid, int hi) {
+        for (int k = lo; k &lt;= hi; k++) aux[k] = a[k];
+        int i = lo, j = mid + 1;
+        for (int k = lo; k &lt;= hi; k++) {
+            if      (i &gt; mid)          a[k] = aux[j++];
+            else if (j &gt; hi)           a[k] = aux[i++];
+            else if (aux[j] &lt; aux[i])  a[k] = aux[j++];
+            else                       a[k] = aux[i++];
+        }
+    }
+}
+// Java's own Arrays.sort(Object[]) uses TimSort, which takes these ideas further:
+// it finds already-sorted "runs" in the input and merges those.</code></pre>
+</div>
+
+<div class="codebox" data-panel="c4" hidden>
+<button class="btn copy" type="button">Copy</button>
+<pre class="code"><code class="language-java">import java.util.Comparator;
+
+public class GenericMergeSort {
+
+    public static &lt;T&gt; void sort(T[] a, Comparator&lt;? super T&gt; cmp) {
+        T[] aux = a.clone();                       // same type and length, no unchecked cast
+        sort(a, aux, 0, a.length - 1, cmp);
+    }
+
+    private static &lt;T&gt; void sort(T[] a, T[] aux, int lo, int hi, Comparator&lt;? super T&gt; cmp) {
+        if (lo &gt;= hi) return;
+        int mid = lo + (hi - lo) / 2;
+        sort(a, aux, lo, mid, cmp);
+        sort(a, aux, mid + 1, hi, cmp);
+        merge(a, aux, lo, mid, hi, cmp);
+    }
+
+    private static &lt;T&gt; void merge(T[] a, T[] aux, int lo, int mid, int hi, Comparator&lt;? super T&gt; cmp) {
+        for (int k = lo; k &lt;= hi; k++) aux[k] = a[k];
+        int i = lo, j = mid + 1;
+        for (int k = lo; k &lt;= hi; k++) {
+            if      (i &gt; mid)                            a[k] = aux[j++];
+            else if (j &gt; hi)                             a[k] = aux[i++];
+            else if (cmp.compare(aux[j], aux[i]) &lt; 0)    a[k] = aux[j++];   // strictly less
+            else                                         a[k] = aux[i++];
+        }
+    }
+
+    record Student(String name, int marks) {}
+
+    public static void main(String[] args) {
+        Student[] s = {
+            new Student("Asha", 72), new Student("Ravi", 85), new Student("Meera", 72),
+            new Student("Kabir", 60), new Student("Dev", 85), new Student("Zoya", 72)
+        };
+        sort(s, Comparator.comparingInt(Student::marks));
+        // Kabir 60, Asha 72, Meera 72, Zoya 72, Ravi 85, Dev 85
+        // Equal marks keep their original order. That's stability.
+    }
+}</code></pre>
+</div>
+
+<div class="codebox" data-panel="c5" hidden>
+<button class="btn copy" type="button">Copy</button>
+<pre class="code"><code class="language-java">// An inversion is a pair (i &lt; j) with a[i] &gt; a[j]. It measures "how unsorted" an array is.
+// Brute force is O(n^2). Merge sort counts them in O(n log n) with ONE extra line.
+static long countInversions(int[] a, int[] aux, int lo, int hi) {
+    if (lo &gt;= hi) return 0;
+    int mid = lo + (hi - lo) / 2;
+    long count = countInversions(a, aux, lo, mid)
+               + countInversions(a, aux, mid + 1, hi);
+
+    for (int k = lo; k &lt;= hi; k++) aux[k] = a[k];
+    int i = lo, j = mid + 1;
+    for (int k = lo; k &lt;= hi; k++) {
+        if      (i &gt; mid)         a[k] = aux[j++];
+        else if (j &gt; hi)          a[k] = aux[i++];
+        else if (aux[j] &lt; aux[i]) {
+            a[k] = aux[j++];
+            count += mid - i + 1;   // this right card jumps ahead of EVERY card still in the left pile
+        }
+        else                      a[k] = aux[i++];
+    }
+    return count;
+}
+// {2, 4, 1, 3, 5}  -&gt;  3 inversions: (2,1), (4,1), (4,3)
+// Classic interview question (LeetCode 493 "Reverse Pairs" and 315 use the same idea).</code></pre>
+</div>
+  </div>
+</section>
+
+<!-- 6. COST -->
+<section id="cost">
+  <span class="eyebrow">Part 3 · Analysis</span>
+  <h2>Why it's n log n, as a picture</h2>
+  <div class="prose stack">
+    <p>Look at the recursion tree as rows. Every row contains all n items, just chopped into smaller piles. Merging every pile in one row touches each item once, so <strong>each row costs n</strong>.</p>
+    <p>How many rows? Each split halves the pile size, and you can halve 8 only 3 times before you hit 1 (8 → 4 → 2 → 1). That's <strong>log₂ n rows</strong>. Rows × cost per row = <strong>n · log₂ n</strong>. And this never changes with the input: sorted, reversed, or random, it always does the same splits.</p>
+  </div>
+  <div class="bench">
+    <div class="levels" id="levels"></div>
+    <p class="note">For n = 8: 3 rows of merging × 8 items each = 24 units of work. Insertion sort's worst case is about 8²/2 = 28. Small n, small difference. Now drag the slider.</p>
+  </div>
+  <div class="bench calc">
+    <label for="c-exp" style="display:grid;gap:6px"><span>Array size <b id="c-n"></b></span><input type="range" id="c-exp" min="3" max="24" value="10"></label>
+    <div class="nums">
+      <div><b id="c-lv"></b><span>levels (log₂ n)</span></div>
+      <div><b id="c-ms"></b><span>merge sort ≈ n·log₂ n</span></div>
+      <div><b id="c-sq"></b><span>insertion sort worst ≈ n²/2</span></div>
+      <div><b id="c-x"></b><span>times less work</span></div>
+    </div>
+    <div class="hbar"><span>Merge sort</span><div class="track"><div class="fill" id="c-b1" style="background:var(--merged)"></div></div></div>
+    <div class="hbar"><span>Insertion sort</span><div class="track"><div class="fill" id="c-b2" style="background:var(--hot)"></div></div></div>
+    <p class="note" id="c-time"></p>
+  </div>
+  <dl class="map prose">
+    <dt>Time (best / avg / worst)</dt><dd><code>O(n log n)</code> in every case. No bad inputs exist.</dd>
+    <dt>Extra space</dt><dd><code>O(n)</code> for <code>aux</code>, plus <code>O(log n)</code> call-stack depth.</dd>
+    <dt>Comparisons</dt><dd>Between ½·n·log₂ n and n·log₂ n. Close to the theoretical minimum for comparison sorts.</dd>
+  </dl>
+</section>
+
+<!-- 7. STABILITY -->
+<section id="stable">
+  <span class="eyebrow">Part 4 · Advanced</span>
+  <h2>Stability: who goes first on a tie?</h2>
+  <div class="prose stack">
+    <p>Back to exam papers. Asha, Meera and Zoya all scored 72, and they handed in their papers in that order. A <strong>stable</strong> sort keeps them in that order after sorting by marks. An unstable sort might shuffle them.</p>
+    <p>Why care? Because it lets you sort in layers. Sort by name first, then stably by marks, and students with equal marks stay alphabetical. Java relies on this: <code>Collections.sort</code> and <code>Arrays.sort(Object[])</code> are guaranteed stable because they're merge-based.</p>
+    <p>In merge sort, stability comes down to one character in the tie rule. Flip it and watch:</p>
+  </div>
+  <div class="bench">
+    <div class="toolbar">
+      <label for="s-rule">On a tie, take from the
+        <select id="s-rule"><option value="left">LEFT pile (aux[j] &lt; aux[i])</option><option value="right">RIGHT pile (aux[j] &lt;= aux[i])</option></select></label>
+    </div>
+    <div class="stack" style="gap:8px"><span class="eyebrow">Hand-in order</span><div class="chips" id="s-in"></div></div>
+    <div class="stack" style="gap:8px"><span class="eyebrow">After merge sort by marks</span><div class="chips" id="s-out"></div></div>
+    <div class="verdict" id="s-verdict"></div>
+  </div>
+</section>
+
+<!-- 8. TUNING -->
+<section id="tuning">
+  <span class="eyebrow">Part 4 · Advanced</span>
+  <h2>Variants and tuning tricks</h2>
+  <dl class="map prose">
+    <dt>Bottom-up</dt><dd>Skip recursion entirely: merge piles of size 1, then 2, then 4. Same cost, no stack. Switch the visualizer to <b>Bottom-up</b> mode to see it. Its tree grows from the leaves up.</dd>
+    <dt>Insertion-sort cutoff</dt><dd>For piles of ~7–15 items, insertion sort is faster than more recursion. Most real implementations switch over. Typically 10–20% faster.</dd>
+    <dt>Skip sorted halves</dt><dd>If <code>a[mid] &lt;= a[mid+1]</code>, the two halves are already in order. Skipping the merge makes sorted input linear.</dd>
+    <dt>Allocate aux once</dt><dd>Create the scratch array in the entry method and pass it down. <code>new int[]</code> inside every call is the most common performance bug.</dd>
+    <dt>Linked lists</dt><dd>Merge sort is the go-to for linked lists: merging just relinks nodes, so extra space drops to O(1) besides the stack. (LeetCode 148 "Sort List".)</dd>
+    <dt>External sort</dt><dd>Data bigger than RAM? Sort chunks that fit in memory, write them to disk, then merge the sorted files. Databases do this for big <code>ORDER BY</code> queries.</dd>
+    <dt>TimSort</dt><dd>Java (objects) and Python's default sort. A merge sort that detects existing sorted runs and uses insertion sort for short ones. It's fast on real-world, partly-sorted data.</dd>
+    <dt>Parallel</dt><dd>The two halves are independent, so they can run on different threads. <code>Arrays.parallelSort</code> does this with the fork/join pool.</dd>
+  </dl>
+</section>
+
+<!-- 9. COMPARE -->
+<section id="compare">
+  <span class="eyebrow">Part 4 · Advanced</span>
+  <h2>Merge sort next to the other usual suspects</h2>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Algorithm</th><th>Best</th><th>Average</th><th>Worst</th><th>Extra memory</th><th>Stable?</th><th>Use it when</th></tr></thead>
+      <tbody>
+        <tr><td class="hl">Merge sort</td><td>n log n</td><td>n log n</td><td>n log n</td><td>n</td><td class="ok">Yes</td><td>You need a guaranteed time, stability, linked lists, or data on disk</td></tr>
+        <tr><td class="hl">Quick sort</td><td>n log n</td><td>n log n</td><td class="bad">n²</td><td>log n</td><td class="bad">No</td><td>Fast in-memory arrays of primitives (Java's <code>Arrays.sort(int[])</code>)</td></tr>
+        <tr><td class="hl">Heap sort</td><td>n log n</td><td>n log n</td><td>n log n</td><td>1</td><td class="bad">No</td><td>Guaranteed time with no extra memory</td></tr>
+        <tr><td class="hl">Insertion sort</td><td>n</td><td class="bad">n²</td><td class="bad">n²</td><td>1</td><td class="ok">Yes</td><td>Tiny or nearly-sorted arrays (and as merge sort's helper)</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- 10. GOTCHA -->
+<section id="gotcha">
+  <div class="gotcha">
+    <span class="eyebrow" style="color:var(--hot)">The one gotcha worth remembering</span>
+    <h2>The tie rule decides stability, and the bug is invisible</h2>
+    <p class="prose">Wrong intuition: "<code>&lt;</code> vs <code>&lt;=</code> doesn't matter, the output is sorted either way." The output <em>is</em> sorted either way. That's exactly why the bug slips through tests on plain <code>int</code> arrays. It only bites when you sort objects by one field and expect equal items to keep their order.</p>
+    <div class="vs">
+      <div><div class="tag bad">✗ Unstable</div>
+<pre class="code"><code class="language-java">// takes RIGHT on a tie
+else if (aux[j] &lt;= aux[i]) a[k] = aux[j++];
+else                      a[k] = aux[i++];</code></pre></div>
+      <div><div class="tag ok">✓ Stable</div>
+<pre class="code"><code class="language-java">// takes LEFT on a tie
+else if (aux[j] &lt; aux[i])  a[k] = aux[j++];
+else                      a[k] = aux[i++];</code></pre></div>
+    </div>
+    <p class="prose"><b>Rule:</b> on a tie, the left pile wins, because left items came first in the original array. Equivalent form if you compare the other way: <code>if (aux[i] &lt;= aux[j]) take left</code>.</p>
+    <h3>Other traps, in order of how often they happen</h3>
+    <ol class="traps prose">
+      <li><b>Mixing inclusive and exclusive bounds.</b> Pick one convention (this page uses <code>a[lo..hi]</code> inclusive) and stick to it. With exclusive <code>hi</code>, the base case becomes <code>hi - lo &lt;= 1</code> and the right half starts at <code>mid</code>, not <code>mid + 1</code>. Mixing them gives infinite recursion or skipped items.</li>
+      <li><b>Allocating <code>new int[]</code> inside merge.</b> Correct, but creates garbage for every call. Allocate <code>aux</code> once.</li>
+      <li><b>Forgetting the leftovers.</b> In the "two while loops" style of merge, people stop when one pile empties and forget to copy the rest of the other pile. The 4-case loop above handles it automatically.</li>
+      <li><b><code>mid = (lo + hi) / 2</code> overflow.</b> If <code>lo + hi</code> exceeds about 2.1 billion it wraps negative. <code>lo + (hi - lo) / 2</code> can't overflow. This was a real bug in Java's own binary search for years.</li>
+    </ol>
+  </div>
+</section>
+
+<!-- 11. QUIZ -->
+<section id="quiz">
+  <span class="eyebrow">Test yourself · answer out loud before you open each one</span>
+  <h2>Quick recall check</h2>
+  <div class="stack prose">
+    <details><summary>1. Why is a single item "already sorted", and why does the algorithm need that fact?</summary><p>There's nothing to compare it with, so no order can be wrong. It's the base case: without it, the recursion would keep splitting forever. Every merge in the algorithm ultimately starts from these one-item piles.</p></details>
+    <details><summary>2. In merge, why do you only ever compare the two TOP items?</summary><p>Both piles are sorted, so each pile's smallest remaining item is its top. The overall smallest remaining item must be one of those two tops. Nothing deeper can beat them.</p></details>
+    <details><summary>3. Trace it: what does [38, 27, 43, 3, 9, 82, 10] look like right after the very first merge?</summary><p>[27, 38, 43, 3, 9, 82, 10]. Top-down goes left-first all the way down, so the first merge is a[0..1] = (38, 27) → (27, 38). Check it in the visualizer with "Your own numbers".</p></details>
+    <details><summary>4. Why does the recursion tree have about log₂ n levels?</summary><p>Each level halves the pile size. Starting from n, the number of halvings until you reach 1 is log₂ n. With n = 1,024 that's only 10 levels.</p></details>
+    <details><summary>5. You change <code>aux[j] &lt; aux[i]</code> to <code>aux[j] &lt;= aux[i]</code>. Does it still sort? What breaks?</summary><p>It still sorts correctly. It loses stability: on a tie it takes the right item first, so equal items can swap their original order.</p></details>
+    <details><summary>6. Why does Java use quicksort for int[] but a merge sort (TimSort) for Object[]?</summary><p>Two equal ints are indistinguishable, so stability is meaningless and quicksort's lower memory use and speed win. Objects with equal keys are different objects, so stability matters, and merge sort guarantees it.</p></details>
+    <details><summary>7. Write merge's four cases from memory, in order.</summary><p>Left pile empty → take right. Right pile empty → take left. Right top strictly smaller → take right. Otherwise (left smaller or tie) → take left.</p></details>
+  </div>
+</section>
+
+</div>
+
+<!-- annotations + notebook UI -->
+<button class="nb-fab nb-ui" id="nb-fab" type="button" aria-controls="nb" aria-expanded="false">✎ Notebook <span class="ct" id="nb-ct" hidden>0</span></button>
+<aside id="nb" class="nb-ui" hidden aria-label="Notebook">
+  <div class="nb-head"><h2>Notebook</h2><button class="nb-x" id="nb-close" type="button">Close</button></div>
+  <div class="nb-status" id="nb-status">Saved in this browser only</div>
+  <div class="nb-tabs" role="tablist">
+    <button type="button" role="tab" aria-selected="true" data-nbtab="notes" id="nbt-notes">My notes</button>
+    <button type="button" role="tab" aria-selected="false" data-nbtab="hl" id="nbt-hl">Highlights (<span id="nb-hlct">0</span>)</button>
+  </div>
+  <div class="nb-body" id="nb-notes"><textarea id="nb-text" spellcheck="true" placeholder="Your scratch pad. Write the merge's four cases from memory, trace an array by hand, list what confused you…&#10;&#10;Tip: select any text on the page and press → Notebook to quote it here."></textarea></div>
+  <div class="nb-body" id="nb-hl" hidden></div>
+  <div class="nb-foot"><button class="nb-x" id="nb-copy" type="button">Copy all notes</button><span class="note" id="nb-copied" style="font-size:.8rem"></span></div>
+</aside>
+<div class="nb-pop nb-ui" id="nb-pop" hidden role="toolbar" aria-label="Highlight selection">
+  <button class="nb-sw" type="button" data-c="y" title="Highlight yellow" aria-label="Highlight yellow"></button>
+  <button class="nb-sw" type="button" data-c="g" title="Highlight green" aria-label="Highlight green"></button>
+  <button class="nb-sw" type="button" data-c="p" title="Highlight pink" aria-label="Highlight pink"></button>
+  <button class="nb-sw" type="button" data-c="b" title="Highlight blue" aria-label="Highlight blue"></button>
+  <span class="sep"></span><button type="button" data-act="note">✎ Note</button><button type="button" data-act="quote">→ Notebook</button>
+</div>
+<div class="nb-edit nb-ui" id="nb-edit" hidden>
+  <blockquote id="nb-eq"></blockquote>
+  <textarea id="nb-en" placeholder="Your note on this highlight…"></textarea>
+  <div class="nb-row">
+    <button class="nb-sw" type="button" data-c="y" aria-label="Yellow"></button><button class="nb-sw" type="button" data-c="g" aria-label="Green"></button><button class="nb-sw" type="button" data-c="p" aria-label="Pink"></button><button class="nb-sw" type="button" data-c="b" aria-label="Blue"></button>
+    <span class="grow"></span><button class="nb-x" type="button" id="nb-edel">Delete</button><button class="nb-x" type="button" id="nb-eok">Done</button>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const fmt = (arr, lo, hi) => '[' + arr.slice(lo, hi + 1).join(', ') + ']';
+const DELAYS = [1500, 1100, 800, 560, 380, 240, 140, 70];
+function rnd(n){ return Array.from({length:n}, () => 3 + Math.floor(Math.random()*96)); }
+
+/* ---------- Merge-step demo ---------- */
+const MD = { L:[3,27,38,43], R:[9,10,82], frames:[], idx:0, timer:null };
+function mdBuild(){
+  const {L,R} = MD, f = [];
+  let i=0, j=0; const out=[];
+  f.push({i,j,out:[],cmp:false,msg:`Two sorted piles. The fingers start on the top cards: <b>${L[0]}</b> on the left, <b>${R[0]}</b> on the right.`});
+  while(i<L.length || j<R.length){
+    if(i>=L.length){
+      f.push({i,j,out:out.slice(),cmp:false,pick:'R',msg:`Left pile is empty. The rest of the right pile is already sorted, so <b>${R[j]}</b> goes straight across.`});
+      out.push(R[j++]);
+    } else if(j>=R.length){
+      f.push({i,j,out:out.slice(),cmp:false,pick:'L',msg:`Right pile is empty. The rest of the left pile is already sorted, so <b>${L[i]}</b> goes straight across.`});
+      out.push(L[i++]);
+    } else if(R[j] < L[i]){
+      f.push({i,j,out:out.slice(),cmp:true,msg:`Compare tops: <b>${L[i]}</b> vs <b>${R[j]}</b>. The right one is smaller.`});
+      out.push(R[j++]);
+    } else {
+      f.push({i,j,out:out.slice(),cmp:true,msg: L[i]===R[j] ? `Tie: <b>${L[i]}</b> = <b>${R[j]}</b>. Take the left one so equal items keep their order.` : `Compare tops: <b>${L[i]}</b> vs <b>${R[j]}</b>. The left one is smaller.`});
+      out.push(L[i++]);
+    }
+    f.push({i,j,out:out.slice(),cmp:false,fresh:true,msg:`Placed <b>${out[out.length-1]}</b> in the output. Output so far: ${'['+out.join(', ')+']'}.`});
+  }
+  f.push({i,j,out:out.slice(),cmp:false,msg:`Done. ${L.length + R.length} cards merged into one sorted pile. Each card moved exactly once.`});
+  MD.frames = f; MD.idx = 0;
+}
+function mdRender(){
+  const fr = MD.frames[MD.idx], {L,R} = MD;
+  const card = (v, cls) => `<div class="card ${cls}">${v}</div>`;
+  $('#md-L').innerHTML = L.map((v,x) => card(v, x<fr.i ? 'L gone' : 'L' + (x===fr.i ? ' top' : '') + (fr.cmp && x===fr.i ? ' cmp' : ''))).join('');
+  $('#md-R').innerHTML = R.map((v,x) => card(v, x<fr.j ? 'R gone' : 'R' + (x===fr.j ? ' top' : '') + (fr.cmp && x===fr.j ? ' cmp' : ''))).join('');
+  const total = L.length + R.length;
+  let o = '';
+  for(let x=0;x<total;x++) o += x < fr.out.length ? card(fr.out[x], 'O' + (fr.fresh && x===fr.out.length-1 ? ' new' : '')) : card('k', 'slot');
+  $('#md-O').innerHTML = o;
+  $('#md-O').querySelectorAll('.slot').forEach((el,x) => el.textContent = x===0 ? 'k' : '');
+  $('#md-msg').innerHTML = fr.msg;
+  $('#md-play').textContent = MD.timer ? '⏸ Pause' : '▶ Play';
+}
+function mdStop(){ clearTimeout(MD.timer); MD.timer = null; }
+function mdTick(){ if(MD.idx < MD.frames.length-1){ MD.idx++; mdRender(); MD.timer = setTimeout(mdTick, 900); } else { mdStop(); mdRender(); } }
+$('#md-play').onclick = () => { if(MD.timer){ mdStop(); mdRender(); } else { if(MD.idx>=MD.frames.length-1) MD.idx=0; MD.timer = setTimeout(mdTick, 200); mdRender(); } };
+$('#md-step').onclick = () => { mdStop(); if(MD.idx < MD.frames.length-1) MD.idx++; mdRender(); };
+$('#md-back').onclick = () => { mdStop(); if(MD.idx > 0) MD.idx--; mdRender(); };
+$('#md-reset').onclick = () => { mdStop(); MD.idx = 0; mdRender(); };
+$('#md-new').onclick = () => {
+  mdStop();
+  const a = 2 + Math.floor(Math.random()*4), b = 2 + Math.floor(Math.random()*4);
+  MD.L = rnd(a).sort((x,y)=>x-y); MD.R = rnd(b).sort((x,y)=>x-y);
+  if(Math.random()<.6) MD.R[Math.floor(Math.random()*b)] = MD.L[Math.floor(Math.random()*a)]; // sometimes force a tie
+  MD.R.sort((x,y)=>x-y);
+  mdBuild(); mdRender();
+};
+mdBuild(); mdRender();
+
+/* ---------- Full visualizer ---------- */
+const PC_MERGE = [
+  ['m',     'merge(a, lo, mid, hi):'],
+  ['mcopy', '  copy a[lo..hi] into aux'],
+  ['mij',   '  i = lo;  j = mid + 1'],
+  ['mfor',  '  for k = lo to hi:'],
+  ['mL',    '    if i > mid:      a[k] = aux[j++]  // left empty'],
+  ['mR',    '    elif j > hi:     a[k] = aux[i++]  // right empty'],
+  ['mC',    '    elif aux[j] < aux[i]: a[k] = aux[j++]'],
+  ['mE',    '    else:            a[k] = aux[i++]  // left or tie'],
+];
+const PC = {
+  td: [
+    ['ms',    'mergeSort(a, lo, hi):'],
+    ['base',  '  if lo >= hi: return         // 1 item'],
+    ['mid',   '  mid = lo + (hi - lo) / 2'],
+    ['left',  '  mergeSort(a, lo, mid)'],
+    ['right', '  mergeSort(a, mid + 1, hi)'],
+    ['merge', '  merge(a, lo, mid, hi)'],
+    ['', ''], ...PC_MERGE],
+  bu: [
+    ['bu',     'mergeSortBottomUp(a):'],
+    ['buw',    '  for width = 1; width < n; width *= 2:'],
+    ['bulo',   '    for lo = 0; lo < n-width; lo += 2*width:'],
+    ['buhi',   '      mid = lo + width - 1'],
+    ['buhi2',  '      hi  = min(lo + 2*width - 1, n - 1)'],
+    ['bumerge','      merge(a, lo, mid, hi)'],
+    ['', ''], ...PC_MERGE]
+};
+
+function build(input, mode){
+  const n = input.length, a = input.slice(), aux = new Array(n).fill(null);
+  const frames = [], nodes = [], key = {}, stack = [];
+  let cmp = 0, wr = 0, auxOn = false, done = [];
+  const addNode = (lo,hi,row) => { nodes.push({lo,hi,row,init:input.slice(lo,hi+1),final:null}); return nodes.length-1; };
+  const push = o => frames.push(Object.assign({arr:a.slice(), aux:auxOn?aux.slice():null, cmp, wr, stack:stack.slice(), done:done.slice(),
+    lo:null, mid:null, hi:null, i:null, j:null, k:null, line:'', node:null, msg:'', ev:null}, o));
+
+  function merge(lo, mid, hi, node){
+    stack.push(`merge(${lo}, ${mid}, ${hi})`);
+    const R = {lo, mid, hi, node};
+    push({...R, line:'m', msg:`Enter merge: left pile a[${lo}..${mid}] = ${fmt(a,lo,mid)}, right pile a[${mid+1}..${hi}] = ${fmt(a,mid+1,hi)}. Both already sorted.`});
+    for(let k=lo;k<=hi;k++) aux[k] = a[k];
+    auxOn = true;
+    push({...R, line:'mcopy', msg:`Copy a[${lo}..${hi}] onto the desk (aux). Now a[${lo}..${hi}] can be overwritten safely.`});
+    let i = lo, j = mid + 1;
+    push({...R, line:'mij', i, j, msg:`i = ${i} points at the left top (<b>${aux[i]}</b>). j = ${j} points at the right top (<b>${aux[j]}</b>).`});
+    for(let k=lo;k<=hi;k++){
+      let line, msg, from, ev = 'pick';
+      if(i > mid){ line='mL'; from='j'; msg=`k = ${k}. Left pile is empty, take <b>${aux[j]}</b> from the right.`; }
+      else if(j > hi){ line='mR'; from='i'; msg=`k = ${k}. Right pile is empty, take <b>${aux[i]}</b> from the left.`; }
+      else {
+        cmp++; ev = 'cmp';
+        if(aux[j] < aux[i]){ line='mC'; from='j'; msg=`k = ${k}. Is ${aux[j]} &lt; ${aux[i]}? Yes. Right top is smaller, take <b>${aux[j]}</b>.`; }
+        else { line='mE'; from='i'; msg = aux[j]===aux[i] ? `k = ${k}. Tie (${aux[i]} = ${aux[j]}). Take the left one to keep equal items in order.` : `k = ${k}. Is ${aux[j]} &lt; ${aux[i]}? No. Left top is smaller, take <b>${aux[i]}</b>.`; }
+      }
+      push({...R, line, i, j, k, ev, msg});
+      const v = from==='j' ? aux[j++] : aux[i++];
+      a[k] = v; wr++;
+      push({...R, line, i, j, k, ev:'write', msg:`a[${k}] = <b>${v}</b>.`});
+    }
+    nodes[node].final = a.slice(lo, hi+1); done[node] = true;
+    push({...R, line:'mfor', ev:'merged', msg:`Merged! a[${lo}..${hi}] = ${fmt(a,lo,hi)} is sorted.`});
+    auxOn = false; stack.pop();
+  }
+
+  if(mode === 'td'){
+    (function mk(lo,hi,row){ key[lo+'-'+hi] = addNode(lo,hi,row); if(hi>lo){ const m = lo + ((hi-lo)>>1); mk(lo,m,row+1); mk(m+1,hi,row+1); } })(0, n-1, 0);
+    done = new Array(nodes.length).fill(false);
+    push({msg:`Start with ${n} unsorted numbers. Press <b>Step</b> or <b>Play</b>.`});
+    (function ms(lo, hi){
+      const node = key[lo+'-'+hi];
+      stack.push(`mergeSort(${lo}, ${hi})`);
+      push({lo, hi, node, line:'ms', msg:`Call mergeSort(${lo}, ${hi}) on ${fmt(a,lo,hi)}.`});
+      if(lo >= hi){
+        nodes[node].final = [a[lo]]; done[node] = true;
+        push({lo, hi, node, line:'base', msg:`Just one item (<b>${a[lo]}</b>). One item is always sorted, so return.`});
+        stack.pop(); return;
+      }
+      push({lo, hi, node, line:'base', msg:`${hi-lo+1} items, so not the base case. Keep splitting.`});
+      const mid = lo + ((hi-lo)>>1);
+      push({lo, mid, hi, node, line:'mid', msg:`mid = ${lo} + (${hi} − ${lo}) / 2 = ${mid}. Left half a[${lo}..${mid}], right half a[${mid+1}..${hi}].`});
+      push({lo, mid, hi, node, line:'left', msg:`Hand the left half ${fmt(a,lo,mid)} to a helper (recursive call).`});
+      ms(lo, mid);
+      push({lo, mid, hi, node, line:'right', msg:`Left half came back sorted: ${fmt(a,lo,mid)}. Now the right half ${fmt(a,mid+1,hi)}.`});
+      ms(mid+1, hi);
+      push({lo, mid, hi, node, line:'merge', msg:`Both halves are sorted: ${fmt(a,lo,mid)} and ${fmt(a,mid+1,hi)}. Merge them.`});
+      merge(lo, mid, hi, node);
+      stack.pop();
+    })(0, n-1);
+  } else {
+    for(let x=0;x<n;x++) key['0:'+x] = addNode(x,x,0);
+    let row = 1;
+    for(let w=1; w<n; w*=2, row++) for(let lo=0; lo<n-w; lo+=2*w) key[row+':'+lo] = addNode(lo, Math.min(lo+2*w-1, n-1), row);
+    done = new Array(nodes.length).fill(false);
+    for(let x=0;x<n;x++){ done[x] = true; nodes[x].final = [input[x]]; }
+    stack.push('mergeSortBottomUp(a)');
+    push({line:'bu', msg:`Bottom-up: treat each of the ${n} items as a sorted pile of size 1. No recursion needed.`});
+    row = 1;
+    for(let w=1; w<n; w*=2, row++){
+      push({line:'buw', msg:`Pass with width = ${w}: merge neighbouring piles of size ${w} into piles of size ${2*w}.`});
+      for(let lo=0; lo<n-w; lo+=2*w){
+        const mid = lo + w - 1, hi = Math.min(lo + 2*w - 1, n-1), node = key[row+':'+lo];
+        push({lo, mid, hi, node, line:'bulo', msg:`lo = ${lo}. Next pair of piles starts here.`});
+        push({lo, mid, hi, node, line:'buhi', msg:`mid = ${lo} + ${w} − 1 = ${mid}. Left pile ends at index ${mid}.`});
+        push({lo, mid, hi, node, line:'buhi2', msg:`hi = min(${lo + 2*w - 1}, ${n-1}) = ${hi}.${hi < lo+2*w-1 ? ' The last pile is short, that\'s fine.' : ''}`});
+        push({lo, mid, hi, node, line:'bumerge', msg:`Merge a[${lo}..${mid}] with a[${mid+1}..${hi}].`});
+        merge(lo, mid, hi, node);
+      }
+      const lonely = (Math.ceil(n/w) % 2 === 1) ? (Math.floor(n/(2*w)) * 2*w) : -1;
+      if(lonely >= 0 && lonely < n && 2*w < n) push({line:'bulo', msg:`The pile starting at ${lonely} has no partner this pass. It waits for a wider pass.`});
+    }
+    stack.pop();
+  }
+  push({line:'', final:true, msg:`Done! Sorted with <b>${cmp}</b> comparisons and <b>${wr}</b> writes.`});
+  return {frames, nodes};
+}
+
+const V = { mode:'td', input:[38,27,43,3,9,82,10,55], frames:[], nodes:[], idx:0, timer:null };
+
+function vLoad(){
+  vStop();
+  const r = build(V.input, V.mode);
+  V.frames = r.frames; V.nodes = r.nodes; V.idx = 0;
+  $('#v-scrub').max = V.frames.length - 1;
+  const pc = PC[V.mode];
+  let ln = 0;
+  $('#v-pc').innerHTML = pc.map(([id, t]) => {
+    if(!t) return '<div> </div>';
+    ln++;
+    const c = t.indexOf('//');
+    const body = c >= 0 ? esc(t.slice(0,c)) + '<span class="c">' + esc(t.slice(c)) + '</span>' : esc(t);
+    return `<div data-l="${id}"><span class="ln">${ln}</span> ${body}</div>`;
+  }).join('');
+  $('#v-treetitle').textContent = V.mode === 'td' ? 'Recursion tree (splits go down)' : 'Merge passes (piles grow downward)';
+  $('#v-treehint').textContent = V.mode === 'td' ? 'pink = current call · green = sorted' : 'row 0 = single items · each row doubles the pile size';
+  vRender();
+}
+
+function vRender(){
+  const f = V.frames[V.idx], n = V.input.length, max = Math.max(...V.input);
+  const cols = `repeat(${n}, minmax(26px, 1fr))`;
+  const inMerge = f.aux !== null;
+  let bars = '', idx = '', km = '', auxr = '', ijm = '';
+  for(let c=0;c<n;c++){
+    let cls = '';
+    if(f.final) cls = 'sorted';
+    else if(f.lo === null) cls = '';
+    else if(c < f.lo || c > f.hi) cls = 'out';
+    else if(f.ev === 'merged') cls = 'M';
+    else if(inMerge && f.k !== null){ const lim = f.ev === 'write' ? f.k : f.k - 1; cls = c <= lim ? 'M' : 'stale'; }
+    else if(inMerge) cls = 'stale';
+    else if(f.mid !== null) cls = c <= f.mid ? 'L' : 'R';
+    else cls = 'A';
+    if(f.ev === 'write' && c === f.k) cls += ' wk';
+    const v = f.arr[c];
+    bars += `<div class="col ${cls}"><span class="v">${v}</span><div class="bar" style="height:${Math.max(6, v/max*150)}px"></div></div>`;
+    idx += `<div class="${f.mid !== null && !f.final && c === f.mid + 1 ? 'split' : ''}">${c}</div>`;
+    km += `<div>${f.k === c ? '<span class="k">k↑</span>' : ''}</div>`;
+    if(inMerge && c >= f.lo && c <= f.hi){
+      const side = c <= f.mid ? 'L' : 'R';
+      const used = (side==='L' && f.i !== null && c < f.i) || (side==='R' && f.j !== null && c < f.j);
+      const top = (side==='L' && c === f.i) || (side==='R' && c === f.j);
+      const isCmp = f.ev === 'cmp' && top;
+      auxr += `<div class="cell ${side}${used?' used':''}${top && !used?' top':''}${isCmp?' cmp':''}">${f.aux[c]}</div>`;
+      ijm += `<div>${f.i === c && f.i <= f.mid ? '<span class="i">i↑</span>' : ''}${f.j === c && f.j <= f.hi ? '<span class="j">j↑</span>' : ''}</div>`;
+    } else { auxr += `<div class="cell empty"></div>`; ijm += '<div></div>'; }
+  }
+  $('#v-stage').innerHTML =
+    `<div class="row bars" style="grid-template-columns:${cols}">${bars}</div>` +
+    `<div class="row idx" style="grid-template-columns:${cols}">${idx}</div>` +
+    `<div class="row mk" style="grid-template-columns:${cols}">${km}</div>` +
+    `<div class="auxlab">aux[] · the desk ${inMerge ? '' : '(empty outside merge)'}</div>` +
+    `<div class="row aux" style="grid-template-columns:${cols}">${auxr}</div>` +
+    `<div class="row mk" style="grid-template-columns:${cols}">${ijm}</div>`;
+
+  // tree
+  const rows = Math.max(...V.nodes.map(x => x.row)) + 1;
+  const act = f.node !== null ? V.nodes[f.node] : null;
+  $('#v-tree').style.gridTemplateColumns = cols;
+  $('#v-tree').style.gridTemplateRows = `repeat(${rows}, auto)`;
+  $('#v-tree').innerHTML = V.nodes.map((nd, id) => {
+    let cls = '', vals;
+    if(f.done[id]){ cls = 'done'; vals = nd.final; }
+    else if(id === f.node){ cls = 'active'; vals = f.arr.slice(nd.lo, nd.hi+1); }
+    else if(V.mode === 'td' && act && nd.lo <= act.lo && act.hi <= nd.hi && nd.row < act.row){ cls = 'open'; vals = f.arr.slice(nd.lo, nd.hi+1); }
+    else vals = V.mode === 'td' ? nd.init : nd.init.map(() => '·');
+    if(f.final) cls = 'done';
+    return `<div class="node ${cls}" style="grid-column:${nd.lo+1} / ${nd.hi+2};grid-row:${nd.row+1}">${vals.map(v => `<span>${v}</span>`).join('')}</div>`;
+  }).join('');
+
+  // pseudocode + stack + stats
+  document.querySelectorAll('#v-pc div[data-l]').forEach(d => d.classList.toggle('on', d.dataset.l === f.line));
+  $('#v-stack').innerHTML = f.stack.length ? f.stack.map(s => `<div>${s}</div>`).join('') : '<span class="note">empty</span>';
+  $('#v-msg').innerHTML = f.msg;
+  $('#v-n-step').textContent = `${V.idx}/${V.frames.length-1}`;
+  $('#v-n-cmp').textContent = f.cmp;
+  $('#v-n-wr').textContent = f.wr;
+  $('#v-scrub').value = V.idx;
+  $('#v-play').textContent = V.timer ? '⏸ Pause' : '▶ Play';
+}
+function vStop(){ clearTimeout(V.timer); V.timer = null; }
+function vTick(){ if(V.idx < V.frames.length-1){ V.idx++; vRender(); V.timer = setTimeout(vTick, DELAYS[+$('#v-speed').value]); } else { vStop(); vRender(); } }
+function vPlay(){ if(V.timer){ vStop(); vRender(); } else { if(V.idx >= V.frames.length-1) V.idx = 0; V.timer = setTimeout(vTick, 150); vRender(); } }
+function vStep(d){ vStop(); V.idx = Math.min(V.frames.length-1, Math.max(0, V.idx + d)); vRender(); }
+$('#v-play').onclick = vPlay;
+$('#v-step').onclick = () => vStep(1);
+$('#v-back').onclick = () => vStep(-1);
+$('#v-reset').onclick = () => { vStop(); V.idx = 0; vRender(); };
+$('#v-scrub').oninput = e => { vStop(); V.idx = +e.target.value; vRender(); };
+$('#v-mode').onchange = e => { V.mode = e.target.value; vLoad(); };
+$('#v-shuffle').onclick = () => { V.input = rnd(+$('#v-size').value); $('#v-err').textContent = ''; vLoad(); };
+$('#v-size').onchange = () => $('#v-shuffle').click();
+$('#v-use').onclick = () => {
+  const nums = $('#v-input').value.split(/[\s,]+/).filter(Boolean).map(Number);
+  if(nums.some(x => !Number.isFinite(x))){ $('#v-err').textContent = 'Use whole numbers separated by spaces or commas.'; return; }
+  if(nums.length < 2 || nums.length > 16){ $('#v-err').textContent = 'Enter between 2 and 16 numbers.'; return; }
+  $('#v-err').textContent = '';
+  V.input = nums.map(x => Math.max(0, Math.min(999, Math.round(x)))); vLoad();
+};
+$('#v-input').onkeydown = e => { if(e.key === 'Enter') $('#v-use').click(); };
+$('#viz').addEventListener('keydown', e => {
+  if(e.target.closest('input[type=text], select')) return;
+  if(e.key === 'ArrowRight'){ e.preventDefault(); vStep(1); }
+  else if(e.key === 'ArrowLeft'){ e.preventDefault(); vStep(-1); }
+  else if(e.key === ' ' && e.target === $('#viz')){ e.preventDefault(); vPlay(); }
+});
+vLoad();
+
+/* ---------- Code tabs + copy ---------- */
+document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
+  document.querySelectorAll('.tab').forEach(x => x.setAttribute('aria-selected', x === t));
+  document.querySelectorAll('[data-panel]').forEach(p => p.hidden = p.dataset.panel !== t.dataset.tab);
+});
+document.querySelectorAll('.copy').forEach(b => b.onclick = () => {
+  const code = b.parentElement.querySelector('code');
+  const done = () => { b.textContent = 'Copied'; setTimeout(() => b.textContent = 'Copy', 1400); };
+  try {
+    navigator.clipboard.writeText(code.textContent).then(done, () => selectText(code));
+  } catch(e){ selectText(code); }
+});
+function selectText(el){ const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+
+/* ---------- Levels picture (n = 8) ---------- */
+(function(){
+  const base = [38,27,43,3,9,82,10,55];
+  const rows = [];
+  for(let size=1; size<=8; size*=2){
+    const blocks = [];
+    for(let lo=0; lo<8; lo+=size) blocks.push(base.slice(lo, lo+size).sort((x,y)=>x-y));
+    rows.push({size, blocks});
+  }
+  $('#levels').innerHTML = rows.map(r => `<div class="lvl"><div class="blocks">${r.blocks.map(b => `<div class="blk" style="grid-column:span ${r.size}">${b.join(' ')}</div>`).join('')}</div><span class="w">${r.size===1 ? 'start: 8 piles of 1' : `merge → 8 items touched`}</span></div>`).join('');
+})();
+
+/* ---------- n log n calculator ---------- */
+function fmtBig(x){
+  if(x >= 1e12) return (x/1e12).toFixed(1) + ' T';
+  if(x >= 1e9) return (x/1e9).toFixed(1) + ' B';
+  if(x >= 1e6) return (x/1e6).toFixed(1) + ' M';
+  if(x >= 1e4) return (x/1e3).toFixed(0) + ' K';
+  return Math.round(x).toLocaleString();
+}
+function fmtTime(s){
+  if(s < 1e-3) return (s*1e6).toFixed(0) + ' µs';
+  if(s < 1) return (s*1e3).toFixed(1) + ' ms';
+  if(s < 120) return s.toFixed(1) + ' s';
+  if(s < 7200) return (s/60).toFixed(0) + ' minutes';
+  if(s < 172800) return (s/3600).toFixed(1) + ' hours';
+  return (s/86400).toFixed(0) + ' days';
+}
+function calc(){
+  const e = +$('#c-exp').value, n = 2**e, ms = n*e, sq = n*(n-1)/2;
+  $('#c-n').textContent = 'n = ' + n.toLocaleString();
+  $('#c-lv').textContent = e;
+  $('#c-ms').textContent = fmtBig(ms);
+  $('#c-sq').textContent = fmtBig(sq);
+  $('#c-x').textContent = fmtBig(sq/ms) + '×';
+  $('#c-b1').style.width = (ms/Math.max(ms,sq)*100) + '%';
+  $('#c-b2').style.width = '100%';
+  $('#c-time').textContent = `At roughly 100 million simple steps per second: merge sort ≈ ${fmtTime(ms/1e8)}, insertion sort worst case ≈ ${fmtTime(sq/1e8)}.`;
+}
+$('#c-exp').oninput = calc; calc();
+
+/* ---------- Stability demo ---------- */
+const STU = [['Asha',72],['Ravi',85],['Meera',72],['Kabir',60],['Dev',85],['Zoya',72]].map(([name,m],pos) => ({name,m,pos}));
+function stableSort(arr, takeLeftOnTie){
+  const a = arr.slice(), aux = a.slice();
+  (function s(lo,hi){
+    if(lo >= hi) return;
+    const mid = lo + ((hi-lo)>>1); s(lo,mid); s(mid+1,hi);
+    for(let k=lo;k<=hi;k++) aux[k] = a[k];
+    let i=lo, j=mid+1;
+    for(let k=lo;k<=hi;k++){
+      if(i>mid) a[k]=aux[j++];
+      else if(j>hi) a[k]=aux[i++];
+      else if(takeLeftOnTie ? aux[j].m < aux[i].m : aux[j].m <= aux[i].m) a[k]=aux[j++];
+      else a[k]=aux[i++];
+    }
+  })(0, a.length-1);
+  return a;
+}
+function chip(s){ return `<div class="chip g${s.m}"><b>${s.m}</b><span>${s.name}</span><small>handed in #${s.pos+1}</small></div>`; }
+function stab(){
+  const left = $('#s-rule').value === 'left';
+  const out = stableSort(STU, left);
+  $('#s-in').innerHTML = STU.map(chip).join('');
+  $('#s-out').innerHTML = out.map(chip).join('');
+  const groups = [72, 85].map(m => {
+    const names = out.filter(s => s.m === m);
+    const ok = names.every((s,x) => x === 0 || names[x-1].pos < s.pos);
+    return `<div>Marks ${m}: ${names.map(s => s.name).join(' → ')} <span class="${ok?'ok':'bad'}">${ok ? '✓ original order kept' : '✗ order changed'}</span></div>`;
+  });
+  $('#s-verdict').innerHTML = groups.join('') + `<p class="note" style="margin-top:8px">${left ? 'Both lists are sorted by marks, and ties keep their hand-in order. Stable.' : 'Still sorted by marks, but equal-mark students got reshuffled. Unstable. The output looks "correct", which is why this bug hides.'}</p>`;
+}
+$('#s-rule').onchange = stab; stab();
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-java.min.js"></script>
+<script>
+/* ===== Annotations + notebook =====
+   Highlights are stored as {quote, prefix, suffix} and re-found in the text on load, so they survive re-renders.
+   Saved in the viewer's private db area (data/users/<id>/...) when available, otherwise in this browser. */
+(() => {
+  const q = s => document.querySelector(s);
+  const ROOT = q('.wrap');
+  const SKIP = '.bench, script, style, button, select, textarea, input, .nb-ui';
+  const LS = 'merge-sort-notes-v1';
+  const state = { text: '', annos: [] };
+  let remote = null, editing = null;
+
+  /* ---------- storage ---------- */
+  try { const d = JSON.parse(localStorage.getItem(LS) || 'null'); if (d) { state.text = d.text || ''; state.annos = d.annos || []; } } catch (e) {}
+  const saveLocal = () => { try { localStorage.setItem(LS, JSON.stringify(state)); } catch (e) {} };
+  const STATUS = { local: 'Saved in this browser only', connecting: 'Connecting to your saved notes…', db: 'Saved to your account · private to you',
+    saving: 'Saving…', slow: "Can't reach your saved notes yet. Showing this browser's copy.", error: "Couldn't save to your account. Kept in this browser." };
+  const setStatus = k => { const el = q('#nb-status'); el.textContent = STATUS[k]; el.classList.toggle('bad', k === 'error' || k === 'slow'); };
+  const timers = {}, writing = {}, dirty = {};
+  function persist(k) {                       // k: 'nb' (notebook text) or 'an' (annotations)
+    saveLocal();
+    if (!remote) return;
+    dirty[k] = true; clearTimeout(timers[k]);
+    timers[k] = setTimeout(() => flush(k), k === 'nb' ? 800 : 250);   // one write per pause
+  }
+  async function flush(k) {
+    if (writing[k] || !dirty[k]) return;
+    writing[k] = true; dirty[k] = false; setStatus('saving');
+    try {
+      if (k === 'nb') await remote.nb.set({ text: state.text });
+      else await remote.an.set({ items: state.annos });
+      setStatus('db');
+    } catch (e) { setStatus('error'); }
+    writing[k] = false;
+    if (dirty[k]) flush(k);
+  }
+  async function connect() {
+    if (!window.claude || !window.claude.use) return;
+    let db = null, user = null;
+    try { [db, user] = await Promise.all([claude.use('db'), claude.use('user')]); } catch (e) {}
+    if (!db || !user) return;
+    const uid = await user.id(); if (!uid) return;
+    const base = 'data/users/' + uid;
+    remote = { nb: db.doc(base + '/notebook'), an: db.doc(base + '/annotations') };
+    setStatus('connecting');
+    const slow = setTimeout(() => setStatus('slow'), 10000);
+    const seen = { nb: false, an: false };
+    const first = (k, s) => {                 // first answer from the server: upload this browser's copy if the account has none
+      if (s.metadata.fromCache || seen[k]) return;
+      seen[k] = true; clearTimeout(slow); setStatus('db');
+      if (!s.exists && (k === 'nb' ? state.text : state.annos.length)) { dirty[k] = true; flush(k); }
+    };
+    remote.nb.onSnapshot(s => {
+      first('nb', s);
+      const d = s.exists ? s.data() : null;
+      if (d && !s.metadata.hasPendingWrites && typeof d.text === 'string' && d.text !== state.text && document.activeElement !== q('#nb-text')) {
+        state.text = d.text; q('#nb-text').value = d.text; saveLocal();
+      }
+    }, () => { clearTimeout(slow); setStatus('error'); remote = null; });
+    remote.an.onSnapshot(s => {
+      first('an', s);
+      const d = s.exists ? s.data() : null;
+      if (d && !s.metadata.hasPendingWrites && Array.isArray(d.items) && JSON.stringify(d.items) !== JSON.stringify(state.annos)) {
+        state.annos = d.items; saveLocal(); paint(); list();
+      }
+    }, () => { clearTimeout(slow); setStatus('error'); remote = null; });
+  }
+
+  /* ---------- text index + anchoring ---------- */
+  function index() {
+    const w = document.createTreeWalker(ROOT, NodeFilter.SHOW_TEXT, { acceptNode: n => n.parentElement.closest(SKIP) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+    let text = ''; const nodes = [];
+    for (let n; (n = w.nextNode());) { nodes.push({ n, s: text.length }); text += n.data; }
+    return { text, nodes };
+  }
+  function fromSelection() {
+    const sel = getSelection();
+    if (!sel.rangeCount || sel.isCollapsed) return null;
+    const r = sel.getRangeAt(0);
+    if (!ROOT.contains(r.commonAncestorContainer)) return null;
+    const ix = index(); let s = -1, e = -1;
+    for (const { n, s: at } of ix.nodes) {
+      if (!r.intersectsNode(n)) continue;
+      const a = at + (n === r.startContainer ? r.startOffset : 0), b = at + (n === r.endContainer ? r.endOffset : n.data.length);
+      if (s < 0) s = a; e = b;
+    }
+    if (s < 0 || e <= s) return null;
+    while (s < e && /\s/.test(ix.text[s])) s++;
+    while (e > s && /\s/.test(ix.text[e - 1])) e--;
+    const quote = ix.text.slice(s, e);
+    if (!quote || quote.length > 3000) return null;
+    return { quote, prefix: ix.text.slice(Math.max(0, s - 40), s), suffix: ix.text.slice(e, e + 40) };
+  }
+  function locate(ix, a) {
+    let best = -1, bestScore = -1;
+    for (let i = ix.text.indexOf(a.quote); i >= 0; i = ix.text.indexOf(a.quote, i + 1)) {
+      let sc = 0;
+      for (let k = 1; k <= a.prefix.length && ix.text[i - k] === a.prefix[a.prefix.length - k]; k++) sc++;
+      for (let k = 0; k < a.suffix.length && ix.text[i + a.quote.length + k] === a.suffix[k]; k++) sc++;
+      if (sc > bestScore) { bestScore = sc; best = i; }
+    }
+    return best;
+  }
+  function wrap(ix, start, end, a) {
+    const parts = [];
+    for (const { n, s } of ix.nodes) {
+      const ns = s, ne = s + n.data.length;
+      if (ne <= start || ns >= end) continue;
+      parts.push([n, Math.max(start, ns) - ns, Math.min(end, ne) - ns]);
+    }
+    for (const [n, ls, le] of parts) {
+      let t = n;
+      if (ls > 0) t = t.splitText(ls);
+      if (le - ls < t.data.length) t.splitText(le - ls);
+      if (!t.data.trim() && t.data.includes('\n')) continue;   // skip layout whitespace, keep real spaces
+      const m = document.createElement('mark');
+      m.className = 'anno' + (a.note ? ' has-note' : ''); m.dataset.id = a.id; m.dataset.c = a.c;
+      m.title = a.note ? a.note.slice(0, 200) : 'Click to add a note';
+      t.parentNode.insertBefore(m, t); m.appendChild(t);
+    }
+  }
+  function paint() {
+    ROOT.querySelectorAll('mark.anno').forEach(m => m.replaceWith(...m.childNodes));
+    ROOT.normalize();
+    for (const a of state.annos) {
+      const ix = index(), at = locate(ix, a);
+      a.lost = at < 0;
+      if (!a.lost) wrap(ix, at, at + a.quote.length, a);
+    }
+    const n = state.annos.length;
+    q('#nb-ct').hidden = !n; q('#nb-ct').textContent = n; q('#nb-hlct').textContent = n;
+  }
+
+  /* ---------- selection toolbar ---------- */
+  const pop = q('#nb-pop'); let pending = null;
+  const place = (el, rect) => {
+    el.hidden = false;
+    const w = el.offsetWidth, x = Math.min(Math.max(8, rect.left + rect.width / 2 - w / 2), innerWidth - w - 8);
+    const above = rect.top - el.offsetHeight - 10;
+    el.style.left = (x + scrollX) + 'px';
+    el.style.top = ((above > 8 ? above : rect.bottom + 10) + scrollY) + 'px';
+  };
+  function onSelect() {
+    setTimeout(() => {
+      const sel = getSelection();
+      if (!sel.rangeCount || sel.isCollapsed) { pop.hidden = true; return; }
+      const node = sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);
+      if (!node || node.closest(SKIP) || !ROOT.contains(node)) { pop.hidden = true; return; }
+      pending = fromSelection();
+      if (!pending) { pop.hidden = true; return; }
+      place(pop, sel.getRangeAt(0).getBoundingClientRect());
+    }, 10);
+  }
+  const tgt = e => e.target instanceof Element ? e.target : document.body;   // events can come from the document itself
+  document.addEventListener('mouseup', e => { if (!tgt(e).closest('.nb-ui')) onSelect(); });
+  document.addEventListener('keyup', e => { if (e.shiftKey && !tgt(e).closest('textarea, input')) onSelect(); });
+  document.addEventListener('touchend', e => { if (!tgt(e).closest('.nb-ui')) setTimeout(onSelect, 250); });
+  pop.addEventListener('mousedown', e => e.preventDefault());           // keep the selection while clicking
+  pop.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b || !pending) return;
+    if (b.dataset.act === 'quote') {
+      state.text = (state.text ? state.text.replace(/\s*$/, '\n\n') : '') + '> ' + pending.quote.replace(/\n/g, '\n> ') + '\n\n';
+      q('#nb-text').value = state.text; persist('nb');
+      getSelection().removeAllRanges(); pop.hidden = true; openNb('notes');
+      const ta = q('#nb-text'); ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); ta.scrollTop = ta.scrollHeight;
+      return;
+    }
+    const a = { id: 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), c: b.dataset.c || 'y', note: '', ...pending };
+    state.annos.push(a); persist('an');
+    getSelection().removeAllRanges(); pop.hidden = true;
+    paint(); list();
+    if (b.dataset.act === 'note') openEdit(a.id);
+  });
+
+  /* ---------- edit popover ---------- */
+  const ed = q('#nb-edit');
+  function openEdit(id) {
+    const a = state.annos.find(x => x.id === id); if (!a) return;
+    const m = ROOT.querySelector(`mark.anno[data-id="${id}"]`);
+    editing = id;
+    q('#nb-eq').textContent = a.quote; q('#nb-en').value = a.note || '';
+    ed.querySelectorAll('.nb-sw').forEach(s => s.classList.toggle('on', s.dataset.c === a.c));
+    place(ed, m ? m.getBoundingClientRect() : { left: innerWidth / 2, width: 0, top: 120, bottom: 120 });
+    q('#nb-en').focus();
+  }
+  const closeEdit = () => { ed.hidden = true; editing = null; };
+  ROOT.addEventListener('click', e => {
+    const m = e.target.closest('mark.anno');
+    if (m && getSelection().isCollapsed) { e.preventDefault(); openEdit(m.dataset.id); }
+  });
+  q('#nb-en').addEventListener('input', () => {
+    const a = state.annos.find(x => x.id === editing); if (!a) return;
+    a.note = q('#nb-en').value; persist('an');
+    ROOT.querySelectorAll(`mark.anno[data-id="${a.id}"]`).forEach(m => { m.classList.toggle('has-note', !!a.note); m.title = a.note ? a.note.slice(0, 200) : 'Click to add a note'; });
+    list();
+  });
+  ed.addEventListener('click', e => {
+    const sw = e.target.closest('.nb-sw');
+    const a = state.annos.find(x => x.id === editing); if (!a) return;
+    if (sw) { a.c = sw.dataset.c; persist('an'); ed.querySelectorAll('.nb-sw').forEach(s => s.classList.toggle('on', s === sw)); ROOT.querySelectorAll(`mark.anno[data-id="${a.id}"]`).forEach(m => m.dataset.c = a.c); list(); }
+    if (e.target.id === 'nb-edel') { state.annos = state.annos.filter(x => x.id !== a.id); persist('an'); closeEdit(); paint(); list(); }
+    if (e.target.id === 'nb-eok') closeEdit();
+  });
+  document.addEventListener('mousedown', e => {
+    if (!ed.hidden && !tgt(e).closest('#nb-edit') && !tgt(e).closest('mark.anno')) closeEdit();
+    if (!pop.hidden && !tgt(e).closest('#nb-pop')) setTimeout(() => { if (getSelection().isCollapsed) pop.hidden = true; }, 0);
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeEdit(); pop.hidden = true; } });
+
+  /* ---------- notebook drawer ---------- */
+  const nb = q('#nb');
+  function openNb(tab) {
+    nb.hidden = false; document.body.classList.add('nb-open'); q('#nb-fab').setAttribute('aria-expanded', 'true');
+    if (tab) showTab(tab);
+  }
+  function closeNb() { nb.hidden = true; document.body.classList.remove('nb-open'); q('#nb-fab').setAttribute('aria-expanded', 'false'); }
+  function showTab(t) {
+    nb.querySelectorAll('[data-nbtab]').forEach(b => b.setAttribute('aria-selected', b.dataset.nbtab === t));
+    q('#nb-notes').hidden = t !== 'notes'; q('#nb-hl').hidden = t !== 'hl';
+    try { localStorage.setItem(LS + '-tab', t); } catch (e) {}
+  }
+  q('#nb-fab').onclick = () => nb.hidden ? openNb() : closeNb();
+  q('#nb-close').onclick = closeNb;
+  nb.querySelector('.nb-tabs').onclick = e => { const b = e.target.closest('[data-nbtab]'); if (b) showTab(b.dataset.nbtab); };
+  const ta = q('#nb-text');
+  ta.value = state.text;
+  ta.addEventListener('input', () => { state.text = ta.value; persist('nb'); });
+  ta.addEventListener('keydown', e => { if (e.key === 'Tab') { e.preventDefault(); ta.setRangeText('  ', ta.selectionStart, ta.selectionEnd, 'end'); state.text = ta.value; persist('nb'); } });
+  function list() {
+    const box = q('#nb-hl');
+    if (!state.annos.length) { box.innerHTML = '<p class="nb-empty">No highlights yet. Select any text in the lesson, then pick a colour or ✎ Note.</p>'; return; }
+    box.innerHTML = '';
+    for (const a of state.annos) {
+      const it = document.createElement('div'); it.className = 'nb-item'; it.dataset.c = a.c;
+      const qt = document.createElement('q'); qt.textContent = a.quote; it.append(qt);
+      if (a.note) { const n = document.createElement('div'); n.className = 'n'; n.textContent = a.note; it.append(n); }
+      if (a.lost) { const l = document.createElement('div'); l.className = 'lost'; l.textContent = 'This text changed on the page, so the highlight can\'t be shown. Your note is kept.'; it.append(l); }
+      const row = document.createElement('div'); row.className = 'nb-row';
+      row.innerHTML = `${a.lost ? '' : '<button class="nb-x" type="button" data-go>Show in lesson</button><button class="nb-x" type="button" data-ed>Edit note</button>'}<span class="grow"></span><button class="nb-x" type="button" data-del>Delete</button>`;
+      row.onclick = e => {
+        if (e.target.closest('[data-del]')) { state.annos = state.annos.filter(x => x.id !== a.id); persist('an'); paint(); list(); }
+        const m = ROOT.querySelector(`mark.anno[data-id="${a.id}"]`);
+        if (m && e.target.closest('[data-go]')) { m.scrollIntoView({ behavior: 'smooth', block: 'center' }); m.classList.remove('flash'); void m.offsetWidth; m.classList.add('flash'); }
+        if (m && e.target.closest('[data-ed]')) { m.scrollIntoView({ block: 'center' }); setTimeout(() => openEdit(a.id), 50); }
+      };
+      it.append(row); box.append(it);
+    }
+  }
+  q('#nb-copy').onclick = () => {
+    const hl = state.annos.map(a => `> ${a.quote}${a.note ? '\n' + a.note : ''}`).join('\n\n');
+    const all = `# Merge sort notes\n\n${state.text.trim()}\n\n## Highlights\n\n${hl}`;
+    const done = t => { q('#nb-copied').textContent = t; setTimeout(() => q('#nb-copied').textContent = '', 2000); };
+    const fallback = () => {
+      const tmp = document.createElement('textarea'); tmp.value = all; tmp.className = 'nb-ui';
+      tmp.style.cssText = 'position:fixed;left:-9999px;top:0'; document.body.append(tmp); tmp.select();
+      let ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
+      tmp.remove(); done(ok ? 'Copied' : 'Copy not available here');
+    };
+    try { navigator.clipboard.writeText(all).then(() => done('Copied'), fallback); } catch (e) { fallback(); }
+  };
+  try { showTab(localStorage.getItem(LS + '-tab') || 'notes'); } catch (e) { showTab('notes'); }
+
+  /* ---------- start: after the code highlighter has run ---------- */
+  const start = () => { paint(); list(); connect(); };
+  if (document.readyState === 'complete') setTimeout(start, 0); else addEventListener('load', () => setTimeout(start, 0));
+})();
+</script>
